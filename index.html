@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Biedtrainer</title>
+<title>Biedtrainer — Berry5</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
@@ -170,6 +170,14 @@ input[type=text]:focus,textarea:focus{outline:none;border-color:var(--felt);back
 .nav-arrow{width:38px;height:38px;border:1px solid var(--line);background:#fff;border-radius:3px;font-size:16px;color:var(--felt);cursor:pointer;display:flex;align-items:center;justify-content:center;}
 .nav-arrow:hover:not(:disabled){background:var(--paper-deep);border-color:var(--felt);}
 .nav-arrow:disabled{opacity:.3;cursor:not-allowed;}
+/* COMPETITIE-NAVIGATIE */
+.comp-nav{background:#fffdf7;border:1px solid var(--line);border-radius:3px;padding:10px 12px;margin-top:14px;}
+.comp-nav .comp-title{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;text-align:center;}
+.comp-nav .comp-row{display:flex;align-items:center;gap:8px;}
+.comp-nums{display:flex;flex-wrap:wrap;gap:5px;flex:1;justify-content:center;}
+button.comp-num{min-width:32px;height:32px;border:1px solid var(--line);background:#ffffff !important;border-radius:3px;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:'Inter',sans-serif;transition:all .12s;}
+button.comp-num:hover{border-color:var(--felt);}
+button.comp-num.on{background:var(--felt) !important;color:#fff;border-color:var(--felt);}
 
 /* biedbox-cel die als 'huidig bod' gemarkeerd is in replay */
 button.bid-pill.cur{background:var(--felt) !important;color:#fff !important;border-color:var(--felt);opacity:1 !important;}
@@ -180,9 +188,7 @@ button.sp:disabled[style*="outline"]{opacity:1 !important;}
 .replay-seq th{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--paper);background:var(--felt);padding:6px 2px;font-weight:600;}
 .replay-seq td{text-align:center;padding:6px 2px;font-size:16px;font-family:'Cormorant Garamond',serif;border-top:1px solid var(--line-soft);cursor:pointer;}
 .replay-seq td.cur{background:var(--gold);color:#fff;}
-.replay-seq td.future{cursor:default;}
-.replay-seq td.pending{background:var(--gold);color:#fff;font-weight:700;}
-button.bid-pill.wrong{background:#8b1a1a !important;border-color:#8b1a1a !important;color:#fff !important;}
+.replay-seq td.future{opacity:.3;}
 .replay-seq td.hascom{position:relative;}
 .replay-seq td.hascom::after{content:'\25cf';font-size:6px;color:var(--gold);position:absolute;top:3px;right:4px;}
 .mode-switch{display:flex;gap:6px;margin-bottom:12px;}
@@ -340,7 +346,7 @@ function decideOvercall(hand,HP,L,A,last,ok,R,AI){
 function respondToOneOfSuit(hand,HP,L,opening,ok,R,AI){
   const os=bidSuit(opening),major=(os==='S'||os==='H'),FP=fitPoints(hand,os);
   if(major&&L[os]>=3){
-    if(FP>=16)return R('2NT',`Jacoby 2SA: ${FP} FP, fit ${os}`);
+    if(FP>=16)return R('2NT',`Berry's Jacoby 2SA: ${FP} FP, fit ${os}`);
     if(FP>=13&&ok('4'+os))return R('4'+os,`Manche fit ${os}, ${FP} FP`);
     if(FP>=11&&ok('3'+os))return R('3'+os,`Invite fit ${os}, ${FP} FP`);
     if(FP>=6&&ok('2'+os))return R('2'+os,`Steun ${os}: ${FP} FP`);
@@ -618,15 +624,19 @@ function extractBoards(txt){
   return{pt,bs};
 }
 function combinePbn(files){
-  let r='% PBN 2.1\n% Biedtrainer\n\n';const all=[];
+  let r='% PBN 2.1\n% Biedtrainer Berry5 — Competitie\n\n';const all=[];
   for(const f of files){const {pt,bs}=extractBoards(f.content);bs.forEach(b=>all.push({text:b,pt}));}
-  const keys=['Event','Site','Date','West','North','East','South','Scoring','Dealer','Vulnerable'];
+  // GEEN Event/Site/Description overnemen: die verraden de biedsituatie.
+  const keys=['Date','West','North','East','South','Scoring','Dealer','Vulnerable'];
   all.forEach((b,i)=>{
     let t=b.text.replace(/\[Board\s+"[^"]*"\]/,'[Board "'+(i+1)+'"]');
+    // anonimiseer: verklappende tags eruit; {commentaren} en [Note]-tags blijven staan
+    t=t.replace(/\[(Event|Site|Description)\s+"[^"]*"\]\s*\n?/g,'');
     const present=new Set([...t.matchAll(/\[(\w+)\s+"/g)].map(m=>m[1]));
     const pre=keys.filter(k=>!present.has(k)&&b.pt[k]!==undefined).map(k=>'['+k+' "'+b.pt[k]+'"]');
-    if(pre.length)t=pre.join('\n')+'\n'+t;
-    r+=t+'\n\n';
+    let head='[Event "Competitie"]\n';
+    if(pre.length)head+=pre.join('\n')+'\n';
+    r+=head+t+'\n\n';
   });
   return r;
 }
@@ -639,6 +649,18 @@ async function uploadToDrive(name,content,parentId,token){
   });
   if(!r.ok)throw new Error('Upload mislukt ('+r.status+')');
   return r.json();
+}
+// zoek map op naam (waar dan ook op de Drive); bestaat hij niet, maak hem aan in Mijn Drive
+async function ensureFolder(name,token){
+  const q=encodeURIComponent("name='"+name+"' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const d=await driveGet('https://www.googleapis.com/drive/v3/files?q='+q+'&fields='+encodeURIComponent('files(id,name)')+'&pageSize=5',token);
+  if(d.files&&d.files.length)return d.files[0].id;
+  const r=await fetch('https://www.googleapis.com/drive/v3/files?fields=id',{
+    method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+    body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder',parents:['root']})
+  });
+  if(!r.ok)throw new Error("Map '"+name+"' aanmaken mislukt ("+r.status+')');
+  return (await r.json()).id;
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -737,44 +759,37 @@ function EvalVertical({hand,trump}){
 }
 
 // Commentaarvak (toont commentaar bij de huidige biedstap)
-function CommentBox({comment,pending}){
+function CommentBox({comment}){
   return(<div className="comment-box">
     <div className="cb-lbl">Commentaar bij dit bod</div>
-    {pending
-      ? <div className="cb-empty">Doe eerst je bod — het commentaar verschijnt daarna.</div>
-      : comment
-        ? <div className="cb-txt">{comment}</div>
-        : <div className="cb-empty">Geen commentaar bij dit bod.</div>}
+    {comment
+      ? <div className="cb-txt">{comment}</div>
+      : <div className="cb-empty">Geen commentaar bij dit bod.</div>}
   </div>);
 }
 
-// Biedbox die een 'huidig bod' markeert (replay), klikbaar is (generatief of Zuid-beurt in replay)
-// wrongBid: laatst geprobeerd fout bod van Zuid -> rood gemarkeerd
-function BidBoxMarked({onBid,minVal,canDouble,canRedouble,currentBid,readOnly,wrongBid}){
+// Biedbox die een 'huidig bod' markeert (replay) of klikbaar is (generatief)
+function BidBoxMarked({onBid,minVal,canDouble,canRedouble,currentBid,readOnly}){
   const grid=[];
   for(let lv=1;lv<=7;lv++)for(const s of['C','D','H','S','NT']){
     const bid=lv+s,val=(lv-1)*5+SUIT_RANK[s],off=val<=minVal;
     const isCur=currentBid===bid;
-    const isWrong=wrongBid===bid;
-    grid.push(<button key={bid} className={"bid-pill"+(isCur?' cur':'')+(isWrong?' wrong':'')} disabled={readOnly||off} onClick={()=>!readOnly&&onBid(bid)}>
-      {lv}{s==='NT'?'SA':<span style={{color:(isCur||isWrong)?'#fff':(s==='H'||s==='D')?'#8b1a1a':'#1a1a2e'}}>{SUIT_SYM[s]}</span>}
+    grid.push(<button key={bid} className={"bid-pill"+(isCur?' cur':'')} disabled={readOnly||off} onClick={()=>!readOnly&&onBid(bid)}>
+      {lv}{s==='NT'?'SA':<span style={{color:isCur?'#fff':(s==='H'||s==='D')?'#8b1a1a':'#1a1a2e'}}>{SUIT_SYM[s]}</span>}
     </button>);
   }
-  const wrongStyle={outline:'3px solid #8b1a1a',outlineOffset:'1px',background:'#8b1a1a',color:'#fff'};
   return(<div className="bidbox">
     <div className="bb-grid">{grid}</div>
     <div className="bb-special">
-      <button className="sp pas" style={wrongBid==='Pas'?wrongStyle:currentBid==='Pas'?{outline:'3px solid var(--gold)',outlineOffset:'1px'}:null} disabled={readOnly} onClick={()=>!readOnly&&onBid('Pas')}>Pas</button>
-      <button className="sp dbl" style={wrongBid==='X'?wrongStyle:currentBid==='X'?{outline:'3px solid var(--gold)'}:null} disabled={readOnly||!canDouble} onClick={()=>!readOnly&&onBid('X')}>Doublet</button>
-      <button className="sp rdbl" style={wrongBid==='XX'?wrongStyle:currentBid==='XX'?{outline:'3px solid var(--gold)'}:null} disabled={readOnly||!canRedouble} onClick={()=>!readOnly&&onBid('XX')}>Redoublet</button>
+      <button className="sp pas" style={currentBid==='Pas'?{outline:'3px solid var(--gold)',outlineOffset:'1px'}:null} disabled={readOnly} onClick={()=>!readOnly&&onBid('Pas')}>Pas</button>
+      <button className="sp dbl" style={currentBid==='X'?{outline:'3px solid var(--gold)'}:null} disabled={readOnly||!canDouble} onClick={()=>!readOnly&&onBid('X')}>Doublet</button>
+      <button className="sp rdbl" style={currentBid==='XX'?{outline:'3px solid var(--gold)'}:null} disabled={readOnly||!canRedouble} onClick={()=>!readOnly&&onBid('XX')}>Redoublet</button>
     </div>
   </div>);
 }
 
-// Compacte biedsequentie-tabel voor replay (klikbaar t/m huidige stap)
-// - Toekomstige biedingen (na de huidige stap) worden NIET getoond
-// - Een onopgeloste Zuid-stap toont '?' totdat Zuid goed biedt of ▶ indrukt
-function ReplaySeq({auction,comments,dealer,curStep,pending,onJump}){
+// Compacte biedsequentie-tabel voor replay (klikbaar, commentaar-stip)
+function ReplaySeq({auction,comments,dealer,curStep,onJump}){
   const cols=['W','N','E','S'];
   const offset=cols.indexOf(dealer);
   const cells=[];
@@ -784,19 +799,13 @@ function ReplaySeq({auction,comments,dealer,curStep,pending,onJump}){
   const rows=[];for(let r=0;r<cells.length;r+=4)rows.push(cells.slice(r,r+4));
   return(<div className="replay-seq"><table>
     <thead><tr>{cols.map(c=>(<th key={c}>{DNL(c)}</th>))}</tr></thead>
-    <tbody>{rows.map((row,ri)=>(<tr key={ri}>{row.map((c,ci)=>{
-      const isFuture=!c.pad&&c.idx>curStep;
-      const isPendingCell=!c.pad&&pending&&c.idx===curStep;
-      const clickable=!c.pad&&c.idx<=curStep&&!isPendingCell;
-      return(
+    <tbody>{rows.map((row,ri)=>(<tr key={ri}>{row.map((c,ci)=>(
       <td key={ci}
-        className={(c.idx===curStep&&!pending?' cur':'')+(isPendingCell?' pending':'')+(isFuture?' future':'')+(c.com&&!isFuture&&!isPendingCell?' hascom':'')}
-        style={clickable?null:{cursor:'default'}}
-        onClick={()=>clickable&&onJump(c.idx)}>
-        {c.pad||isFuture?'':isPendingCell?'?':bidCell(c.bid)}
+        className={(c.pad?'':'')+(c.idx===curStep?' cur':'')+(c.idx>curStep?' future':'')+(c.com?' hascom':'')}
+        onClick={()=>!c.pad&&onJump(c.idx)}>
+        {c.pad?'':bidCell(c.bid)}
       </td>
-      );
-    })}</tr>))}</tbody>
+    ))}</tr>))}</tbody>
   </table></div>);
 }
 
@@ -847,7 +856,7 @@ function finalContract(history,dealer){
 //     vooruit/terug door de sequentie. Geen eigen bieden.
 //   - GENERATIEF: een geschud spel; Zuid biedt zelf, NOW bieden generatief.
 // ════════════════════════════════════════════════════════════════════════
-function BiedenTab({loadedBoard}){
+function BiedenTab({loadedBoard,competition,compIdx,onCompGo}){
   const [mode,setMode]=useState('generatief'); // 'replay' | 'generatief'
   const [deal,setDeal]=useState(()=>dealRandom());
   const [dealer,setDealer]=useState('N');
@@ -866,9 +875,6 @@ function BiedenTab({loadedBoard}){
   const [auction,setAuction]=useState([]);       // volledige veiling uit PBN
   const [auctionComments,setAuctionComments]=useState([]);
   const [step,setStep]=useState(0);              // index van het 'huidige' bod
-  const [pending,setPending]=useState(false);    // Zuid-stap nog niet opgelost ('?')
-  const [revealed,setRevealed]=useState(()=>new Set()); // opgeloste/onthulde Zuid-stappen
-  const [replayFb,setReplayFb]=useState(null);   // {status:'ok'|'no',bid} feedback op Zuid-bod
 
   // ---- GENERATIEF ----
   const evalBid=useCallback((d,seat,bid,hist,dlr)=>{
@@ -912,8 +918,6 @@ function BiedenTab({loadedBoard}){
     setDeal(b.hands);setDealer(b.dealer);setVul(b.vulnerable);
     setBoardInfo({event:b.event,description:b.description,board:b.board});
     setAuction(b.auction||[]);setAuctionComments(b.auctionComments||[]);setStep(0);
-    setRevealed(new Set());setReplayFb(null);
-    setPending((b.auction||[]).length>0&&seatOf(b.dealer,0)==='S');
     setThinking(false);setDone(false);setFeedback(null);
   },[]);
 
@@ -950,16 +954,12 @@ function BiedenTab({loadedBoard}){
   const isReplay=mode==='replay';
   // in replay: de "veiling tot en met de huidige stap" voor evaluatie/contract
   const shownHistory=isReplay?auction.slice(0,step+1):history;
-  // in replay: baseer troef-evaluatie alleen op het al zichtbare deel van de veiling
-  // (de volledige veiling zou het eindcontract verraden)
   const trumpForEval=useMemo(()=>{
-    const fc=finalContract(isReplay?shownHistory:history,dealer);return fc.trump;
-  },[isReplay,shownHistory,history,dealer]);
+    const fc=finalContract(isReplay?auction:history,dealer);return fc.trump;
+  },[isReplay,auction,history,dealer]);
 
   const curBidReplay=isReplay?auction[step]:null;
   const curComment=isReplay?auctionComments[step]:null;
-  // is de replay volledig doorlopen? (laatste stap bereikt en opgelost)
-  const replayComplete=isReplay&&auction.length>0&&step>=auction.length-1&&!pending;
 
   // biedbox-context (generatief: minimumbod + doublet; replay: markering)
   const genMinVal=minBidValue(history);
@@ -968,39 +968,13 @@ function BiedenTab({loadedBoard}){
   const isSouthTurn=!isReplay&&genCurSeat==='S'&&!done;
   const genFinal=useMemo(()=>finalContract(history,dealer),[history,dealer]);
 
-  // navigeer naar stap i: Zuid-stappen die nog niet zijn opgelost tonen '?'
-  function goToStep(i){
-    setStep(i);setReplayFb(null);
-    setPending(seatOf(dealer,i)==='S'&&!revealed.has(i));
-  }
-  function stepPrev(){if(step>0)goToStep(step-1);}
-  function stepNext(){
-    if(pending){ // vooruitknop bij open Zuid-stap = antwoord onthullen
-      setRevealed(r=>{const n=new Set(r);n.add(step);return n;});
-      setPending(false);setReplayFb(null);
-      return;
-    }
-    if(step<auction.length-1)goToStep(step+1);
-  }
-  // Zuid biedt zelf in replay-modus: vergelijk met het PBN-bod
-  function onReplaySouthBid(bid){
-    const target=auction[step];
-    if(bid===target){
-      setRevealed(r=>{const n=new Set(r);n.add(step);return n;});
-      setPending(false);
-      setReplayFb({status:'ok',bid});
-    }else{
-      setReplayFb({status:'no',bid}); // rood tonen, opnieuw proberen mag
-    }
-  }
-  // biedbox-context voor Zuid-beurt in replay
-  const replayMinVal=isReplay&&pending?minBidValue(auction.slice(0,step)):-1;
-  const replayDbl=isReplay&&pending?doubleState(auction.slice(0,step),dealer):{canDouble:false,canRedouble:false};
+  function stepPrev(){setStep(s=>Math.max(0,s-1));}
+  function stepNext(){setStep(s=>Math.min(auction.length-1,s+1));}
 
   return(<div className="page">
     <div className="topbar">
       <h1 className="serif">Biedtrainer</h1>
-      <div className="sub">voor clubspelers</div>
+      <div className="sub">Berry5 voor Clubspelers</div>
     </div>
 
     {boardInfo&&(
@@ -1016,24 +990,18 @@ function BiedenTab({loadedBoard}){
       <div className="bl-left">
         <ZuidVertical hand={deal.S}/>
         <EvalVertical hand={deal.S} trump={trumpForEval}/>
-        {isReplay&&<CommentBox comment={pending?null:curComment} pending={pending}/>}
+        {isReplay&&<CommentBox comment={curComment}/>}
       </div>
 
       <div className="bl-right">
         {isReplay?(<>
-          <ReplaySeq auction={auction} comments={auctionComments} dealer={dealer} curStep={step} pending={pending} onJump={goToStep}/>
           <div className="replay-nav">
             <button className="nav-arrow" onClick={stepPrev} disabled={step<=0}>◀</button>
-            <span className="step">
-              {pending
-                ? <>Bod {step+1} / {auction.length} — <b>Zuid: jouw beurt</b></>
-                : <>Bod {step+1} / {auction.length} — {DNL(seatOf(dealer,step))}</>}
-            </span>
-            <button className="nav-arrow" onClick={stepNext} disabled={!pending&&step>=auction.length-1} title={pending?'Antwoord tonen':'Volgende bod'}>▶</button>
+            <span className="step">Bod {step+1} / {auction.length} — {DNL(seatOf(dealer,step))}</span>
+            <button className="nav-arrow" onClick={stepNext} disabled={step>=auction.length-1}>▶</button>
           </div>
-          {pending
-            ? <BidBoxMarked onBid={onReplaySouthBid} minVal={replayMinVal} canDouble={replayDbl.canDouble} canRedouble={replayDbl.canRedouble} currentBid={null} readOnly={false} wrongBid={replayFb&&replayFb.status==='no'?replayFb.bid:null}/>
-            : <BidBoxMarked currentBid={curBidReplay} readOnly={true} minVal={-1} canDouble={false} canRedouble={false} onBid={()=>{}}/>}
+          <ReplaySeq auction={auction} comments={auctionComments} dealer={dealer} curStep={step} onJump={setStep}/>
+          <BidBoxMarked currentBid={curBidReplay} readOnly={true} minVal={-1} canDouble={false} canRedouble={false} onBid={()=>{}}/>
         </>):(<>
           {thinking&&<div className="status"><span className="thinking">●</span> {DNL(genCurSeat)} denkt na…</div>}
           <AuctionTable history={history} dealer={dealer} evals={evals}/>
@@ -1050,10 +1018,10 @@ function BiedenTab({loadedBoard}){
         <div className="lbl">{feedback.ai?'Geen vaste regel':feedback.correct?'Correct':'Afwijkend'}</div>
         <div className="txt">
           {feedback.ai
-            ? `Geen deterministische biedregel voor deze situatie — ${feedback.reason}.`
+            ? `Geen deterministische Berry5-regel voor deze situatie — ${feedback.reason}.`
             : feedback.correct
               ? feedback.reason
-              : <>Het biedsysteem verwacht hier <b>{bidLabel(feedback.expected)}</b>. {feedback.reason}</>}
+              : <>Berry5 verwacht hier <b>{bidLabel(feedback.expected)}</b>. {feedback.reason}</>}
         </div>
       </div>
     )}
@@ -1072,20 +1040,8 @@ function BiedenTab({loadedBoard}){
       </div>
     </>)}
 
-    {/* REPLAY: feedback op het bod van Zuid */}
-    {isReplay&&replayFb&&(
-      <div className={"fbbox "+(replayFb.status==='ok'?'ok':'no')}>
-        <div className="lbl">{replayFb.status==='ok'?'Correct':'Afwijkend'}</div>
-        <div className="txt">
-          {replayFb.status==='ok'
-            ? <>Goed geboden: <b>{bidLabel(replayFb.bid)}</b> is het bod uit dit spel. Druk op ▶ om verder te gaan.</>
-            : <><b>{bidLabel(replayFb.bid)}</b> is niet het bod uit dit spel. Probeer opnieuw, of druk op ▶ om het antwoord te zien.</>}
-        </div>
-      </div>
-    )}
-
-    {/* REPLAY: eindcontract + alle handen pas tonen als de hele veiling is doorlopen */}
-    {isReplay&&replayComplete&&(<>
+    {/* REPLAY: alle handen onderaan (voorgeboden = bekend) + eindcontract */}
+    {isReplay&&(<>
       <div className="contract-badge serif" style={{marginTop:14}}>
         Eindcontract: {finalContract(auction,dealer).disp}
       </div>
@@ -1100,6 +1056,22 @@ function BiedenTab({loadedBoard}){
         ))}
       </div>
     </>)}
+
+    {/* COMPETITIE-NAVIGATIE: door de geladen 3/6/12/24 spellen bladeren */}
+    {competition&&(
+      <div className="comp-nav">
+        <div className="comp-title">Competitie · spel {compIdx+1} van {competition.boards.length}</div>
+        <div className="comp-row">
+          <button className="nav-arrow" onClick={()=>onCompGo(compIdx-1)} disabled={compIdx<=0}>◀</button>
+          <div className="comp-nums">
+            {competition.boards.map((b,i)=>(
+              <button key={i} className={"comp-num"+(i===compIdx?' on':'')} onClick={()=>onCompGo(i)}>{i+1}</button>
+            ))}
+          </div>
+          <button className="nav-arrow" onClick={()=>onCompGo(compIdx+1)} disabled={compIdx>=competition.boards.length-1}>▶</button>
+        </div>
+      </div>
+    )}
 
     <button className="btn full" onClick={()=>startGeneratief(dealRandom())} style={{marginTop:10}}>Nieuw geschud spel (zelf bieden)</button>
   </div>);
@@ -1143,7 +1115,7 @@ function TreeNode({node,sel,onToggle,exp,onExp}){
 // ════════════════════════════════════════════════════════════════════════
 //  SPELLEN-TAB  (PBN laden via Drive-bestand, upload of plakken)
 // ════════════════════════════════════════════════════════════════════════
-function SpellenTab({accessToken,onConnect,onLoadBoard}){
+function SpellenTab({accessToken,onConnect,onLoadBoard,onLoadCompetition}){
   const [driveFiles,setDriveFiles]=useState([]);
   const [boards,setBoards]=useState([]);
   const [srcName,setSrcName]=useState('');
@@ -1222,6 +1194,7 @@ function SpellenTab({accessToken,onConnect,onLoadBoard}){
       <div className="card">
         <div className="card-title">{srcName}</div>
         <div className="card-sub">{boards.length} spellen — kies er één om te openen</div>
+        {boards.length>1&&<button className="btn full" style={{marginBottom:10}} onClick={()=>onLoadCompetition(boards,srcName)}>Alle {boards.length} spellen achter elkaar bieden ▶</button>}
         <div className="spel-list">
           {boards.map((b,i)=>(
             <div key={i} className={"spel-item"+(activeIdx===i?' active':'')} onClick={()=>pickBoard(i)}>
@@ -1243,7 +1216,7 @@ function SpellenTab({accessToken,onConnect,onLoadBoard}){
 // ════════════════════════════════════════════════════════════════════════
 //  GENERATOR-TAB  (mappenboom -> willekeurige set -> upload)
 // ════════════════════════════════════════════════════════════════════════
-function GeneratorTab({accessToken,onConnect,onDisconnect,gisLoaded,config,onOpenSettings}){
+function GeneratorTab({accessToken,onConnect,onDisconnect,gisLoaded,config,onOpenSettings,onLoadCompetition,onGoBieden}){
   const [tree,setTree]=useState(null);
   const [treeLoading,setTreeLoading]=useState(false);
   const [sel,setSel]=useState(()=>new Set());
@@ -1299,18 +1272,16 @@ function GeneratorTab({accessToken,onConnect,onDisconnect,gisLoaded,config,onOpe
       const ts=new Date();const p2=n=>String(n).padStart(2,'0');
       const stamp=ts.getFullYear()+'-'+p2(ts.getMonth()+1)+'-'+p2(ts.getDate())+'_'+p2(ts.getHours())+p2(ts.getMinutes());
       const filename='Competitie_'+numGames+'sp_'+stamp+'.pbn';
-      if(config.outputFolderId){
-        add('Upload: '+filename);
-        const result=await uploadToDrive(filename,combined,config.outputFolderId,accessToken);
-        setLastResult({name:filename,link:result.webViewLink});
-        add('Klaar — '+numGames+' spellen opgeslagen in Drive','ok');
-      }else{
-        // geen output-map: bied als download aan
-        const blob=new Blob([combined],{type:'text/plain'});
-        const url=URL.createObjectURL(blob);
-        setLastResult({name:filename,download:url});
-        add('Klaar — geen output-map ingesteld, download hieronder','ok');
-      }
+      add("Map 'Competities' zoeken op Drive…");
+      const folderId=await ensureFolder('Competities',accessToken);
+      add('Upload: '+filename);
+      const result=await uploadToDrive(filename,combined,folderId,accessToken);
+      add(numGames+" spellen (met alle commentaren) opgeslagen in 'Competities'",'ok');
+      // direct speelbaar maken als competitie-wachtrij in de Bieden-tab
+      const compBoards=parsePbn(combined);
+      onLoadCompetition(compBoards,filename,false);
+      setLastResult({name:filename,link:result.webViewLink,loaded:true});
+      add('Competitie klaargezet in de Bieden-tab','ok');
     }catch(e){add('Fout: '+e.message,'err');setError(e.message);}finally{setGenerating(false);}
   }
 
@@ -1349,6 +1320,7 @@ function GeneratorTab({accessToken,onConnect,onDisconnect,gisLoaded,config,onOpe
         <button className="btn full" style={{marginTop:8}} onClick={generate} disabled={generating||stats.av<numGames}>{generating?'Bezig…':'Competitie samenstellen'}</button>
         {log.length>0&&<div className="log">{log.map((l,i)=><div key={i} className={"log-line "+l.k}>{l.k==='ok'?'✓ ':l.k==='err'?'✗ ':'· '}{l.msg}</div>)}</div>}
         {lastResult&&<div className="status ok" style={{marginTop:8}}><b>{lastResult.name}</b> {lastResult.link?<a href={lastResult.link} target="_blank" rel="noreferrer" style={{color:'var(--success)'}}>Openen ↗</a>:lastResult.download?<a href={lastResult.download} download={lastResult.name} style={{color:'var(--success)'}}>Downloaden ↓</a>:''}</div>}
+        {lastResult&&lastResult.loaded&&<button className="btn full" style={{marginTop:8}} onClick={onGoBieden}>Start competitie in Bieden-tab ▶</button>}
         {error&&<div className="status err" style={{marginTop:8}}>{error}</div>}
       </div>
     </>)}
@@ -1378,7 +1350,7 @@ function Settings({config,onSave,onClose}){
     </div>
     <div className="card">
       <div className="card-title">Toelichting</div>
-      <p className="empty-note">Alleen het <b>Client ID</b> is verplicht om met Drive te verbinden. De <b>root-map</b> is nodig voor de Competitie-generator. Een <b>output-map</b> is optioneel — zonder krijg je een download in plaats van een upload. Spellen plakken of uploaden in de Spellen-tab werkt zonder enige instelling.</p>
+      <p className="empty-note">Alleen het <b>Client ID</b> is verplicht om met Drive te verbinden. De <b>root-map</b> is nodig voor de Competitie-generator. Gegenereerde competities worden automatisch opgeslagen in de map <b>Competities</b> op je Drive (wordt aangemaakt als hij nog niet bestaat). Spellen plakken of uploaden in de Spellen-tab werkt zonder enige instelling.</p>
     </div>
   </div>);
 }
@@ -1430,6 +1402,25 @@ function App(){
   }
   function loadBoard(b){setLoadedBoard({...b,_ts:Date.now()});setTab('bieden');}
 
+  // ── COMPETITIE-WACHTRIJ ──
+  const [competition,setCompetition]=useState(null); // {name, boards:[]}
+  const [compIdx,setCompIdx]=useState(0);
+  // spellen worden geanonimiseerd: simpele nummers, geen event/omschrijving die de biedsituatie verraadt
+  function loadCompetition(boards,name,switchTab=true){
+    const clean=boards.map((b,i)=>({...b,board:String(i+1),event:'',description:''}));
+    setCompetition({name,boards:clean});
+    setCompIdx(0);
+    setLoadedBoard({...clean[0],_ts:Date.now()});
+    if(switchTab)setTab('bieden');
+  }
+  function compGo(i){
+    if(!competition)return;
+    const idx=Math.max(0,Math.min(competition.boards.length-1,i));
+    setCompIdx(idx);
+    setLoadedBoard({...competition.boards[idx],_ts:Date.now()});
+    setTab('bieden');
+  }
+
   const tabs=[
     {id:'bieden',ic:'♥',label:'Bieden'},
     {id:'spellen',ic:'♦',label:'Spellen'},
@@ -1451,14 +1442,15 @@ function App(){
 
     {/* display:none/block i.p.v. conditional rendering -> tab-state blijft behouden */}
     <div style={{display:tab==='bieden'?'block':'none'}}>
-      <BiedenTab loadedBoard={loadedBoard}/>
+      <BiedenTab loadedBoard={loadedBoard} competition={competition} compIdx={compIdx} onCompGo={compGo}/>
     </div>
     <div style={{display:tab==='spellen'?'block':'none'}}>
-      <SpellenTab accessToken={accessToken} onConnect={connectGoogle} onLoadBoard={loadBoard}/>
+      <SpellenTab accessToken={accessToken} onConnect={connectGoogle} onLoadBoard={loadBoard} onLoadCompetition={loadCompetition}/>
     </div>
     <div style={{display:tab==='generator'?'block':'none'}}>
       <GeneratorTab accessToken={accessToken} onConnect={connectGoogle} onDisconnect={disconnectGoogle}
-        gisLoaded={gisLoaded} config={config} onOpenSettings={()=>setShowSettings(true)}/>
+        gisLoaded={gisLoaded} config={config} onOpenSettings={()=>setShowSettings(true)}
+        onLoadCompetition={loadCompetition} onGoBieden={()=>setTab('bieden')}/>
     </div>
   </div>);
 }
