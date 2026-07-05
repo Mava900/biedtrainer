@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Biedtrainer</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.27.4/babel.min.js"></script>
+<style>
+:root{
+  --paper:#f7f4ec;--paper-deep:#efeadd;--ink:#1a1a1a;--ink-soft:#4a4a4a;
+  --ink-faint:#8a8378;--felt:#1f3a2e;--felt-soft:#2d4d3e;--gold:#b08d3f;
+  --burgundy:#7a2e3a;--line:#d4cdb8;--line-soft:#e5dfcd;
+  --success:#4a6b3a;--error:#8b3a3a;--red:#8b1a1a;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;font-size:15px;line-height:1.55;}
+.page{max-width:560px;margin:0 auto;padding:18px 14px 140px;}
+.serif{font-family:'Cormorant Garamond',Georgia,serif;}
+
+.topbar{text-align:center;padding:8px 0 16px;border-bottom:1px solid var(--line);margin-bottom:16px;}
+.topbar h1{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:600;color:var(--felt);letter-spacing:.01em;}
+.topbar .sub{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-top:2px;}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border:1px solid var(--felt);background:var(--felt);color:var(--paper);font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;border-radius:2px;cursor:pointer;transition:all .15s;}
+.btn:hover:not(:disabled){background:var(--felt-soft);}
+.btn:disabled{opacity:.35;cursor:not-allowed;}
+.btn.sec{background:transparent;color:var(--felt);border-color:var(--line);}
+.btn.sec:hover:not(:disabled){background:var(--paper-deep);}
+.btn.full{width:100%;}
+
+/* HAND */
+.hand-block{margin-bottom:14px;}
+.hand-name{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px;}
+.hand-row{display:flex;gap:14px;flex-wrap:wrap;font-family:'Cormorant Garamond',serif;font-size:23px;line-height:1.1;}
+.suit{display:flex;align-items:baseline;gap:4px;}
+.suit .sym{font-size:18px;}
+.sym.black{color:#1a1a2e;}.sym.red{color:#8b1a1a;}
+.suit .cards{letter-spacing:.06em;}
+.hidden-hand{font-family:'Cormorant Garamond',serif;font-size:23px;color:var(--ink-faint);letter-spacing:.3em;}
+
+/* EVAL BAR */
+.eval{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+.ev{flex:1;min-width:62px;background:#fffdf7;border:1px solid var(--line);border-radius:3px;padding:7px 4px;text-align:center;}
+.ev .v{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--felt);}
+.ev .l{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);margin-top:1px;}
+
+/* AUCTION TABLE */
+.auc{background:#fffdf7;border:1px solid var(--line);border-radius:3px;overflow:hidden;margin-bottom:14px;}
+.auc table{width:100%;border-collapse:collapse;}
+.auc th{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--paper);background:var(--felt);padding:7px 4px;font-weight:600;}
+.auc td{text-align:center;padding:7px 4px;font-size:16px;font-family:'Cormorant Garamond',serif;border-top:1px solid var(--line-soft);position:relative;}
+.auc td .fb{font-size:10px;position:absolute;top:2px;right:4px;}
+.auc td.me{background:var(--paper-deep);}
+.bid-red{color:#8b1a1a;}.bid-blk{color:#1a1a2e;}
+.fb-ok{color:var(--success);}.fb-no{color:var(--error);}.fb-ai{color:var(--ink-faint);}
+
+/* BIDBOX */
+.bidbox{background:#fffdf7;border:1px solid var(--line);border-radius:3px;padding:12px;margin-bottom:14px;}
+.bb-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-bottom:8px;}
+button.bid-pill{background:#ffffff !important;border:1px solid var(--line);border-radius:3px;padding:9px 2px;font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;cursor:pointer;transition:all .12s;color:var(--ink);}
+button.bid-pill:hover:not(:disabled){border-color:var(--felt);background:var(--paper-deep) !important;}
+button.bid-pill:disabled{opacity:.25;cursor:not-allowed;}
+.bb-special{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;}
+button.sp{border-radius:3px;padding:11px 2px;font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;border:1px solid transparent;color:#fff;}
+button.sp.pas{background:var(--success) !important;}
+button.sp.dbl{background:var(--red) !important;}
+button.sp.rdbl{background:#2d4d8e !important;}
+button.sp:disabled{opacity:.3;cursor:not-allowed;}
+
+/* FEEDBACK */
+.fbbox{border-radius:3px;padding:12px 14px;margin-bottom:12px;font-size:14px;}
+.fbbox .lbl{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+.fbbox.ok{background:#f0f9eb;border:1px solid #7bb86f;}.fbbox.ok .lbl{color:var(--success);}
+.fbbox.no{background:#fdf0f0;border:1px solid #e07070;}.fbbox.no .lbl{color:var(--error);}
+.fbbox.info{background:#f4f0e8;border:1px solid var(--line);}.fbbox.info .lbl{color:var(--felt);}
+.fbbox .txt{color:var(--ink-soft);}
+
+.status{padding:11px 14px;border-radius:2px;font-size:13px;border:1px solid var(--line);background:var(--paper-deep);margin-bottom:12px;color:var(--ink-soft);}
+.thinking{display:inline-block;animation:pulse 1.2s infinite;}
+@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+
+.allhands{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.mini{background:#fffdf7;border:1px solid var(--line);border-radius:3px;padding:10px;}
+.mini .mh{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:5px;font-weight:600;}
+.mini .ml{font-family:'Cormorant Garamond',serif;font-size:15px;line-height:1.3;}
+.contract-badge{text-align:center;background:var(--felt);color:var(--paper);border-radius:3px;padding:10px;margin-bottom:14px;font-family:'Cormorant Garamond',serif;font-size:20px;letter-spacing:.05em;}
+
+/* NAV */
+.app-nav{display:flex;background:var(--felt);border-bottom:2px solid var(--gold);position:sticky;top:0;z-index:100;}
+.nav-tab{flex:1;padding:11px 4px;text-align:center;cursor:pointer;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.55);border:none;background:none;font-family:'Inter',sans-serif;transition:all .15s;line-height:1.3;}
+.nav-tab:hover{color:rgba(255,255,255,.9);}
+.nav-tab.active{color:#fff;background:rgba(255,255,255,.12);border-bottom:2px solid var(--gold);margin-bottom:-2px;}
+.nav-tab .ic{display:block;font-size:15px;margin-bottom:2px;}
+.nav-tab.gear{flex:0 0 44px;}
+
+/* CARDS */
+.card{background:#fffdf7;border:1px solid var(--line);border-radius:3px;padding:18px;margin-bottom:14px;}
+.card-title{font-family:'Cormorant Garamond',serif;font-size:21px;font-weight:600;color:var(--felt);margin-bottom:3px;}
+.card-sub{font-size:12px;color:var(--ink-faint);margin-bottom:14px;font-style:italic;font-family:'Cormorant Garamond',serif;}
+.lbl{display:block;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;}
+input[type=text],textarea{width:100%;padding:10px 12px;border:1px solid var(--line);background:var(--paper);border-radius:2px;font-size:14px;font-family:'Inter',sans-serif;color:var(--ink);}
+input[type=text]:focus,textarea:focus{outline:none;border-color:var(--felt);background:#fff;}
+.btn.danger{background:transparent;color:var(--burgundy);border-color:var(--line);}
+.btn.danger:hover:not(:disabled){background:#fdf3f2;}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;background:var(--paper-deep);border:1px solid var(--line);border-radius:100px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:var(--success);}
+.pill.off .dot{background:var(--ink-faint);}
+.status.err{border-color:var(--error);background:#fdf3f2;color:var(--error);}
+.status.ok{border-color:var(--success);background:#f3f8ef;color:var(--success);}
+
+/* SPELLEN LIST */
+.spel-list{display:flex;flex-direction:column;gap:6px;}
+.spel-item{background:#fffdf7;border:1px solid var(--line);border-radius:3px;padding:11px 13px;cursor:pointer;transition:all .15s;}
+.spel-item:hover{border-color:var(--felt);}
+.spel-item.active{border-color:var(--gold);background:var(--paper-deep);}
+.spel-nr{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);font-weight:600;}
+.spel-title{font-size:14px;color:var(--felt);font-weight:500;margin-top:2px;}
+.spel-meta{font-size:11px;color:var(--ink-faint);margin-top:2px;}
+
+/* MAPPENBOOM */
+.tree-node{font-size:14px;}
+.tree-row{display:flex;align-items:center;gap:7px;padding:5px 2px;cursor:pointer;border-radius:2px;}
+.tree-row:hover{background:var(--paper-deep);}
+.tree-arrow{font-size:9px;color:var(--ink-faint);transition:transform .15s;flex-shrink:0;width:10px;}
+.tree-arrow.open{transform:rotate(90deg);}
+.chk{width:16px;height:16px;border:1.5px solid var(--line);border-radius:3px;flex-shrink:0;cursor:pointer;position:relative;}
+.chk.on{background:var(--felt);border-color:var(--felt);}
+.chk.on::after{content:'\2713';color:#fff;font-size:11px;position:absolute;top:-2px;left:2px;}
+.chk.half{background:var(--line);border-color:var(--ink-faint);}
+.tree-name{flex:1;color:var(--ink-soft);}
+.tree-count{font-size:11px;color:var(--ink-faint);}
+.tree-children{margin-left:18px;border-left:1px solid var(--line-soft);padding-left:4px;}
+
+/* GENERATOR */
+.games-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;}
+.game-btn{background:#fff;border:1px solid var(--line);border-radius:3px;padding:10px 2px;font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--felt);cursor:pointer;display:flex;flex-direction:column;align-items:center;line-height:1.1;}
+.game-btn span{font-family:'Inter';font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);font-weight:500;margin-top:2px;}
+.game-btn.on{background:var(--felt);color:#fff;border-color:var(--felt);}
+.game-btn.on span{color:rgba(255,255,255,.7);}
+.log{margin-top:10px;background:var(--paper-deep);border-radius:3px;padding:10px;font-size:12px;font-family:ui-monospace,monospace;max-height:160px;overflow-y:auto;}
+.log-line{padding:1px 0;color:var(--ink-soft);}
+.log-line.ok{color:var(--success);}.log-line.err{color:var(--error);}
+.empty-note{color:var(--ink-soft);font-size:14px;margin-top:8px;}
+
+/* TWEE-KOLOMS BIEDLAYOUT */
+.bid-layout{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;margin-bottom:14px;}
+@media(max-width:480px){.bid-layout{grid-template-columns:1fr;}}
+.bl-left{display:flex;flex-direction:column;gap:12px;}
+.zuid-vert{background:#fffdf7;border:1px solid var(--line);border-radius:3px;padding:14px;}
+.zuid-vert .zh{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px;}
+.zuid-suit{display:flex;align-items:baseline;gap:8px;font-family:'Cormorant Garamond',serif;font-size:24px;line-height:1.35;}
+.zuid-suit .sym{font-size:19px;width:20px;}
+.eval-vert{display:flex;flex-direction:column;gap:5px;}
+.ev-row{display:flex;justify-content:space-between;align-items:baseline;background:#fffdf7;border:1px solid var(--line);border-radius:3px;padding:7px 12px;}
+.ev-row .l{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);}
+.ev-row .v{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--felt);}
+.comment-box{background:var(--paper-deep);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:0 3px 3px 0;padding:12px 14px;min-height:80px;}
+.comment-box .cb-lbl{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;}
+.comment-box .cb-txt{font-size:14px;color:var(--ink-soft);line-height:1.5;}
+.comment-box .cb-empty{font-size:13px;color:var(--ink-faint);font-style:italic;}
+.bl-right{display:flex;flex-direction:column;gap:10px;}
+
+/* REPLAY-BESTURING */
+.replay-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fffdf7;border:1px solid var(--line);border-radius:3px;padding:8px 12px;}
+.replay-nav .step{font-size:12px;color:var(--ink-faint);letter-spacing:.04em;}
+.nav-arrow{width:38px;height:38px;border:1px solid var(--line);background:#fff;border-radius:3px;font-size:16px;color:var(--felt);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.nav-arrow:hover:not(:disabled){background:var(--paper-deep);border-color:var(--felt);}
+.nav-arrow:disabled{opacity:.3;cursor:not-allowed;}
+
+/* biedbox-cel die als 'huidig bod' gemarkeerd is in replay */
+button.bid-pill.cur{background:var(--felt) !important;color:#fff !important;border-color:var(--felt);opacity:1 !important;}
+button.bid-pill.cur:disabled{opacity:1 !important;}
+button.sp:disabled[style*="outline"]{opacity:1 !important;}
+.replay-seq{background:#fffdf7;border:1px solid var(--line);border-radius:3px;overflow:hidden;}
+.replay-seq table{width:100%;border-collapse:collapse;}
+.replay-seq th{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--paper);background:var(--felt);padding:6px 2px;font-weight:600;}
+.replay-seq td{text-align:center;padding:6px 2px;font-size:16px;font-family:'Cormorant Garamond',serif;border-top:1px solid var(--line-soft);cursor:pointer;}
+.replay-seq td.cur{background:var(--gold);color:#fff;}
+.replay-seq td.future{cursor:default;}
+.replay-seq td.pending{background:var(--gold);color:#fff;font-weight:700;}
+button.bid-pill.wrong{background:#8b1a1a !important;border-color:#8b1a1a !important;color:#fff !important;}
+.replay-seq td.hascom{position:relative;}
+.replay-seq td.hascom::after{content:'\25cf';font-size:6px;color:var(--gold);position:absolute;top:3px;right:4px;}
+.mode-switch{display:flex;gap:6px;margin-bottom:12px;}
+.mode-btn{flex:1;padding:8px;border:1px solid var(--line);background:#fff;border-radius:3px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);cursor:pointer;}
+.mode-btn.on{background:var(--felt);color:#fff;border-color:var(--felt);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const {useState,useMemo,useCallback,useRef,useEffect}=React;
+
+// ════════════════════════════════════════════════════════════════════════
+//  BERRY5 BIEDENGINE  (situatieclassificatie incl. competitieve context)
+// ════════════════════════════════════════════════════════════════════════
+const SUITS=['S','H','D','C'];
+const SUIT_RANK={C:0,D:1,H:2,S:3,NT:4};
+const SEATS=['N','E','S','W'];
+const SUIT_SYM={S:'♠',H:'♥',D:'♦',C:'♣'};
+
+function suitLen(h){return{S:h.S.length,H:h.H.length,D:h.D.length,C:h.C.length};}
+function hcp(h){let p=0;for(const s of SUITS)for(const c of h[s])p+=({A:4,K:3,Q:2,J:1})[c]||0;return p;}
+function controls(h){let c=0;for(const s of SUITS)for(const ch of h[s])c+=({A:2,K:1})[ch]||0;return c;}
+function distPoints(h){const L=suitLen(h);let d=0;for(const s of SUITS){if(L[s]===0)d+=3;else if(L[s]===1)d+=2;else if(L[s]===2)d+=1;}return d;}
+function zarPoints(h){const L=SUITS.map(s=>h[s].length).sort((a,b)=>b-a);return hcp(h)+controls(h)+(L[0]+L[1])+(L[0]-L[3]);}
+function losers(h){let lo=0;for(const s of SUITS){const c=h[s],n=Math.min(c.length,3);if(!n)continue;let sl=n;if(c.includes('A'))sl--;if(c.includes('K')&&c.length>=2)sl--;if(c.includes('Q')&&c.length>=3)sl--;lo+=Math.max(0,sl);}return lo;}
+function fitPoints(h,trump){const L=suitLen(h);let fp=hcp(h);for(const s of SUITS)if(L[s]>=5)fp+=(L[s]-4);if(trump&&trump!=='NT'){for(const s of SUITS){if(s===trump)continue;if(L[s]===0)fp+=5;else if(L[s]===1)fp+=3;else if(L[s]===2)fp+=1;}}return fp;}
+function isBalanced(h){const L=Object.values(suitLen(h)).sort((a,b)=>b-a);return(L[0]===4&&L[3]===3)||(L[0]===4&&L[1]===4&&L[3]===2)||(L[0]===5&&L[2]===3&&L[3]===2);}
+function suitQuality(c){let n=0;for(const ch of c)if('AKQJ'.includes(ch))n++;return n;}
+function bidLevel(b){const m=b.match(/^(\d)/);return m?+m[1]:0;}
+function bidSuit(b){const m=b.match(/^\d(NT|[SHDC])/);return m?m[1]:null;}
+function isRealBid(b){return /^\d/.test(b);}
+function bidValue(b){if(!isRealBid(b))return -1;return(bidLevel(b)-1)*5+SUIT_RANK[bidSuit(b)];}
+function seatOf(dealer,i){return SEATS[(SEATS.indexOf(dealer)+i)%4];}
+function partnerOf(s){return{N:'S',S:'N',E:'W',W:'E'}[s];}
+function isOpp(a,b){return partnerOf(a)!==b&&a!==b;}
+function longestSuits(h){const L=suitLen(h),m=Math.max(L.S,L.H,L.D,L.C);return SUITS.filter(s=>L[s]===m);}
+function openingSuit(h){const L=suitLen(h),fives=SUITS.filter(s=>L[s]>=5);if(fives.length){const mx=Math.max(...fives.map(s=>L[s]));return fives.filter(s=>L[s]===mx)[0];}if(L.D>=4)return'D';if(L.C>=4)return'C';return L.C>=L.D?'C':'D';}
+function isBidAllowed(b,last){if(!isRealBid(b))return true;if(!last)return true;return bidValue(b)>bidValue(last);}
+function cheapestLevel(suit,last){let lv=1;if(last&&isRealBid(last)){const bl=bidLevel(last),ls=SUIT_RANK[bidSuit(last)];lv=(SUIT_RANK[suit]>ls)?bl:bl+1;}return lv;}
+
+function analyzeAuction(hist,dealer,me){
+  const calls=hist.map((bid,i)=>({bid,seat:seatOf(dealer,i),i}));
+  const partner=partnerOf(me);
+  const rho={N:'W',W:'S',S:'E',E:'N'}[me];
+  const myC=calls.filter(c=>c.seat===me);
+  const pC=calls.filter(c=>c.seat===partner);
+  const oppC=calls.filter(c=>isOpp(me,c.seat));
+  const firstReal=calls.find(c=>isRealBid(c.bid));
+  const opener=firstReal?firstReal.seat:null;
+  const opening=firstReal?firstReal.bid:null;
+  let lastReal=null;for(let k=calls.length-1;k>=0;k--)if(isRealBid(calls[k].bid)){lastReal=calls[k];break;}
+  return{
+    calls,me,partner,rho,opener,opening,
+    openedByPartner:opener===partner,openedByMe:opener===me,
+    openedByOpp:opener&&isOpp(me,opener),
+    weBid:[...myC,...pC].some(c=>isRealBid(c.bid)),
+    theyBid:oppC.some(c=>isRealBid(c.bid)),
+    lastReal,
+    rhoLast:[...calls].reverse().find(c=>c.seat===rho),
+    partnerLast:[...calls].reverse().find(c=>c.seat===partner),
+    partnerBids:pC.filter(c=>isRealBid(c.bid)),
+    myBids:myC.filter(c=>isRealBid(c.bid)),
+  };
+}
+
+function hasStopper(h,s){if(s==='NT'||!s)return true;const c=h[s];return c.includes('A')||(c.includes('K')&&c.length>=2)||(c.includes('Q')&&c.length>=3)||c.length>=4;}
+function has4Outside(L,s){return SUITS.some(x=>x!==s&&L[x]>=4);}
+
+function chooseNewSuit(h,L,avoid,HP,ok,needFive,oppSuit){
+  const minLen=needFive?5:4;
+  const cand=SUITS.filter(s=>s!==avoid&&s!==oppSuit&&L[s]>=minLen);
+  if(!cand.length)return null;
+  const byLen=[...cand].sort((a,b)=>L[b]-L[a]||(SUITS.indexOf(b)-SUITS.indexOf(a)));
+  for(const s of byLen){
+    for(let lv=1;lv<=4;lv++){
+      const bid=lv+s;
+      if(!ok(bid))continue;
+      const minHP=lv===1?6:(lv===2?11:16);
+      if(HP>=minHP)return{bid,reason:`Nieuwe kleur ${bid}: ${L[s]}-kaart ${s}, ${HP} HP`};
+      break;
+    }
+  }
+  return null;
+}
+
+function decideBid(hand,history,dealer,me){
+  const A=analyzeAuction(history,dealer,me);
+  const L=suitLen(hand),HP=hcp(hand);
+  const last=A.lastReal?A.lastReal.bid:null;
+  const ok=b=>isBidAllowed(b,last);
+  const R=(bid,reason)=>({bid,reason,deterministic:true});
+  const AI=(reason)=>({bid:null,reason,deterministic:false});
+
+  // 1. Niemand opende
+  if(!A.opener)return decideOpening(hand,HP,L);
+
+  // 2. Tegenpartij opende, partner stil, mijn beurt -> volgbod/doublet
+  if(A.openedByOpp&&A.partnerBids.length===0&&A.myBids.length===0)
+    return decideOvercall(hand,HP,L,A,last,ok,R,AI);
+
+  // 3. Partner opende 1-in-kleur
+  if(A.openedByPartner&&/^1[SHDC]$/.test(A.opening)){
+    if(A.myBids.length===0){
+      return A.theyBid
+        ? respondAfterIntervention(hand,HP,L,A,last,ok,R,AI)
+        : respondToOneOfSuit(hand,HP,L,A.opening,ok,R,AI);
+    }
+    return AI('Vervolgbieding antwoorder');
+  }
+
+  // 4. Ik opende 1-in-kleur -> herbieding
+  if(A.openedByMe&&/^1[SHDC]$/.test(A.opening)&&A.myBids.length===1)
+    return openerRebid(hand,HP,L,A,last,ok,R,AI);
+
+  // 5. 1SA sequenties (ongestoord)
+  if(A.opening==='1NT'&&!A.theyBid){
+    if(A.openedByPartner&&A.myBids.length===0)return respondTo1NT(hand,HP,L,ok,R,AI);
+    if(A.openedByMe)return openerRebidAfter1NT(hand,A,R,AI);
+  }
+  return AI('Niet door kernregels gedekt');
+}
+
+function decideOpening(hand,HP,L){
+  const R=(b,r)=>({bid:b,reason:r,deterministic:true});
+  if(HP>=15&&HP<=17&&isBalanced(hand))return R('1NT','15-17 HP, SA-verdeling');
+  if(HP>=20&&HP<=21&&isBalanced(hand))return R('2NT','20-21 HP, SA-verdeling');
+  if(HP>=22)return R('2C','Sterke opening 22+ HP');
+  const lens=[L.S,L.H,L.D,L.C].sort((a,b)=>b-a);const r20=HP+lens[0]+lens[1];
+  if(HP>=12||(HP>=10&&r20>=20)){const s=openingSuit(hand);return R('1'+s,`Opening 1${s} (${HP} HP, regel van 20=${r20})`);}
+  if(HP>=6&&HP<=10){if(L.S===6)return R('2S','Zwakke twee schoppen');if(L.H===6)return R('2H','Zwakke twee harten');if(L.D===6)return R('2D','Zwakke twee ruiten');}
+  return R('Pas',`Te zwak om te openen (${HP} HP, regel van 20=${r20})`);
+}
+
+function decideOvercall(hand,HP,L,A,last,ok,R,AI){
+  const oppSuit=bidSuit(A.opening);
+  const unbid=SUITS.filter(s=>s!==oppSuit);
+  if(HP>=12&&unbid.every(s=>L[s]>=3)&&L[oppSuit]<=3&&ok('X'))
+    return R('X',`Informatiedoublet: ${HP} HP, steun in ongeboden kleuren`);
+  if(HP>=15&&HP<=18&&isBalanced(hand)&&hasStopper(hand,oppSuit)&&ok('1NT'))
+    return R('1NT',`1SA-volgbod: ${HP} HP, stop in ${oppSuit}`);
+  const fives=SUITS.filter(s=>L[s]>=5)
+    .map(s=>({s,len:L[s],q:suitQuality(hand[s])}))
+    .sort((a,b)=>b.len-a.len||b.q-a.q);
+  for(const c of fives){
+    const lv=cheapestLevel(c.s,last),bid=lv+c.s;
+    if(!ok(bid))continue;
+    const minHP=lv===1?8:10;
+    if(HP>=minHP&&HP<=16&&c.q>=2)return R(bid,`Volgbod ${bid}: ${c.len}-kaart ${c.s}, ${HP} HP`);
+  }
+  if(HP<=11)return R('Pas',`Pas: onvoldoende voor volgbod/doublet (${HP} HP)`);
+  return AI('Grenshand voor volgbod');
+}
+
+function respondToOneOfSuit(hand,HP,L,opening,ok,R,AI){
+  const os=bidSuit(opening),major=(os==='S'||os==='H'),FP=fitPoints(hand,os);
+  if(major&&L[os]>=3){
+    if(FP>=16)return R('2NT',`Jacoby 2SA: ${FP} FP, fit ${os}`);
+    if(FP>=13&&ok('4'+os))return R('4'+os,`Manche fit ${os}, ${FP} FP`);
+    if(FP>=11&&ok('3'+os))return R('3'+os,`Invite fit ${os}, ${FP} FP`);
+    if(FP>=6&&ok('2'+os))return R('2'+os,`Steun ${os}: ${FP} FP`);
+  }
+  const ns=chooseNewSuit(hand,L,os,HP,ok,false,null);
+  if(ns)return R(ns.bid,ns.reason);
+  if(!major&&L[os]>=(os==='D'?4:5)&&L.S<4&&L.H<4){
+    if(FP>=13)return AI('Sterke steun lage kleur');
+    if(FP>=11&&ok('3'+os))return R('3'+os,`Invite steun ${os}: ${FP} FP`);
+    if(FP>=6&&ok('2'+os))return R('2'+os,`Steun ${os}: ${FP} FP`);
+  }
+  if(HP>=13&&HP<=15&&!has4Outside(L,os)&&ok('3NT'))return R('3NT',`3SA: ${HP} HP`);
+  if(HP>=11&&HP<=12&&(os==='C'||os==='D')&&isBalanced(hand)&&L.S<4&&L.H<4&&ok('2NT'))
+    return R('2NT','2SA: 11-12 HP, SA-verdeling');
+  if(HP>=6&&HP<=10&&ok('1NT'))return R('1NT',`1SA: 6-10 HP`);
+  if(HP<6)return R('Pas',`Pas: te zwak (${HP} HP)`);
+  return AI('Antwoord niet gedekt');
+}
+
+function respondAfterIntervention(hand,HP,L,A,last,ok,R,AI){
+  const os=bidSuit(A.opening),major=(os==='S'||os==='H'),FP=fitPoints(hand,os);
+  const rhoBid=A.rhoLast?A.rhoLast.bid:null;
+  const rhoSuit=rhoBid?bidSuit(rhoBid):null;
+  // Negatief doublet
+  if(rhoBid&&isRealBid(rhoBid)&&rhoSuit&&rhoSuit!=='NT'){
+    const rl=bidLevel(rhoBid);
+    if(rl<=3){
+      const unbidM=['S','H'].filter(s=>s!==os&&s!==rhoSuit);
+      if(unbidM.length===1){
+        const m=unbidM[0],minHP=rl===1?6:(rl===2?8:12);
+        if(L[m]>=4&&HP>=minHP&&ok('X'))return R('X',`Negatief doublet: 4+kaart ${m}, ${HP} HP`);
+      }
+      if(unbidM.length===0){
+        const lows=['D','C'].filter(s=>s!==os&&s!==rhoSuit);
+        const minHP=rl===1?6:(rl===2?8:12);
+        if(lows.length>=2&&lows.every(s=>L[s]>=4)&&HP>=minHP&&ok('X'))
+          return R('X',`Negatief doublet: 4-4 lage kleuren, ${HP} HP`);
+      }
+    }
+  }
+  // Drukbieden / steun hoge kleur
+  if(major&&L[os]>=3){
+    if(FP>=16)return R('2NT',`Sterke steun (Jacoby 2SA), ${FP} FP`);
+    if(FP>=13&&ok('4'+os))return R('4'+os,`Manche fit ${os}, ${FP} FP`);
+    if(FP>=11&&ok('3'+os))return R('3'+os,`Steun ${os} (competitief), ${FP} FP`);
+    if(FP>=8&&ok('2'+os))return R('2'+os,`Steun ${os} vanaf 8 (druk), ${FP} FP`);
+  }
+  // Cuebid sterke fit
+  if(rhoSuit&&rhoSuit!=='NT'&&major&&L[os]>=3&&FP>=13){
+    const cue=cheapestLevel(rhoSuit,last)+rhoSuit;
+    if(ok(cue))return R(cue,`Cuebid ${cue}: limietsteun+ ${os}, ${FP} FP`);
+  }
+  const ns=chooseNewSuit(hand,L,os,HP,ok,true,rhoSuit);
+  if(ns)return R(ns.bid,ns.reason+' (na tussenbod)');
+  if(HP>=6&&HP<=10&&ok('1NT'))return R('1NT','1SA na tussenbod: 6-10 HP');
+  if(HP<6)return R('Pas',`Pas na tussenbod: te zwak (${HP} HP)`);
+  return AI('Antwoord na tussenbod niet gedekt');
+}
+
+function openerRebid(hand,HP,L,A,last,ok,R,AI){
+  const myOpen=bidSuit(A.opening);
+  const pBid=A.partnerLast?A.partnerLast.bid:null;
+  if(!pBid||!isRealBid(pBid))return AI('Herbieding na pas/doublet partner');
+  const pSuit=bidSuit(pBid);
+  // Supportdoublet
+  if(A.theyBid&&A.rhoLast&&isRealBid(A.rhoLast.bid)&&pSuit&&(pSuit==='S'||pSuit==='H')&&bidLevel(pBid)===1){
+    if(L[pSuit]===3&&ok('X'))return R('X',`Supportdoublet: precies 3-kaart steun ${pSuit}`);
+    if(L[pSuit]>=4){const lv=cheapestLevel(pSuit,last);if(ok(lv+pSuit))return R(lv+pSuit,`4-kaart steun ${pSuit}, ${HP} HP`);}
+  }
+  if(pSuit&&(pSuit==='S'||pSuit==='H')&&L[pSuit]>=4){
+    if(HP>=18&&ok('4'+pSuit))return R('4'+pSuit,`Sterke steun ${pSuit}, ${HP} HP`);
+    if(HP>=15&&ok('3'+pSuit))return R('3'+pSuit,`Goede steun ${pSuit}, ${HP} HP`);
+    if(ok('2'+pSuit))return R('2'+pSuit,`Steun ${pSuit}, ${HP} HP`);
+  }
+  if(isBalanced(hand)&&HP>=12&&HP<=14&&ok('1NT'))return R('1NT','Herbieding 1SA: 12-14 HP');
+  if(L[myOpen]>=6){const lv=cheapestLevel(myOpen,last);if(ok(lv+myOpen))return R(lv+myOpen,`Herhaling ${myOpen}: 6-kaart, ${HP} HP`);}
+  const ns=chooseNewSuit(hand,L,myOpen,HP,ok,false,null);
+  if(ns)return R(ns.bid,'Herbieding: '+ns.reason);
+  return AI('Herbieding opener niet gedekt');
+}
+
+function respondTo1NT(hand,HP,L,ok,R,AI){
+  if(HP>=8&&(L.S>=4||L.H>=4)&&ok('2C'))return R('2C',`Stayman: 4-kaart hoog, ${HP} HP`);
+  if(L.H>=5&&ok('2D'))return R('2D',`Jacoby transfer harten (${L.H}-kaart)`);
+  if(L.S>=5&&ok('2H'))return R('2H',`Jacoby transfer schoppen (${L.S}-kaart)`);
+  if(HP>=10&&ok('3NT'))return R('3NT',`3SA: ${HP} HP`);
+  if(HP>=8&&HP<=9&&ok('2NT'))return R('2NT',`2SA invite: ${HP} HP`);
+  if(HP<=7)return R('Pas',`Pas op 1SA: ${HP} HP`);
+  return AI('Antwoord op 1SA niet gedekt');
+}
+function openerRebidAfter1NT(hand,A,R,AI){
+  const L=suitLen(hand),pBid=A.partnerLast?A.partnerLast.bid:null;
+  if(pBid==='2C'){if(L.H>=4)return R('2H','Stayman: 4-kaart harten');if(L.S>=4)return R('2S','Stayman: 4-kaart schoppen');return R('2D','Stayman: geen 4-kaart hoog');}
+  if(pBid==='2D')return R('2H','Transfer voltooid harten');
+  if(pBid==='2H')return R('2S','Transfer voltooid schoppen');
+  return AI('Herbieding 1SA-opener niet gedekt');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  AI-FALLBACK  (volledige veilingcontext meegeven)
+// ════════════════════════════════════════════════════════════════════════
+function handToStr(h){return SUITS.map(s=>SUIT_SYM[s]+(h[s]||'-')).join(' ');}
+function buildAuctionContext(history,dealer){
+  const lines=history.map((b,i)=>`${seatOf(dealer,i)}: ${b==='X'?'Doublet':b==='XX'?'Redoublet':b==='Pas'?'Pas':b}`);
+  return lines.join('\n');
+}
+
+async function aiBid(hand,history,dealer,me){
+  const ctx=buildAuctionContext(history,dealer);
+  const partner=partnerOf(me),rho={N:'W',W:'S',S:'E',E:'N'}[me],lho={N:'E',E:'S',S:'W',W:'N'}[me];
+  const prompt=`Je bent een Berry5-voor-Clubspelers biedexpert. Bepaal het volgende bod.
+
+JOUW STOEL: ${me}. Je partner is ${partner}. Je tegenstanders zijn ${lho} (links) en ${rho} (rechts).
+
+JOUW HAND: ${handToStr(hand)}
+Evaluatie: HP=${hcp(hand)}, verdeling ${suitLen(hand).S}-${suitLen(hand).H}-${suitLen(hand).D}-${suitLen(hand).C}.
+
+VEILING TOT NU TOE (deler ${dealer}, in biedvolgorde):
+${ctx||'(nog geen biedingen)'}
+
+BELANGRIJK: houd rekening met ALLE biedingen hierboven — wie heeft geopend, wat heeft je partner getoond, en welke tussenbiedingen of doubletten de tegenpartij deed. Bied competitief volgens Berry5.
+
+Antwoord met UITSLUITEND een JSON-object, geen andere tekst:
+{"bid":"<bod>","reason":"<korte uitleg in het Nederlands>"}
+Geldige biedingen: "Pas","X","XX","1C".."7NT".`;
+  try{
+    const resp=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,messages:[{role:"user",content:prompt}]})
+    });
+    const data=await resp.json();
+    const text=data.content.filter(b=>b.type==='text').map(b=>b.text).join('').replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(text);
+    let bid=(parsed.bid||'Pas').replace('Pass','Pas').replace('Dbl','X').replace('Rdbl','XX');
+    return{bid,reason:parsed.reason||'AI-beslissing',deterministic:false};
+  }catch(e){
+    return{bid:'Pas',reason:'AI-fallback faalde — gepast',deterministic:false};
+  }
+}
+
+// Hoofdfunctie: bepaal bod van een NIET-Zuid speler
+async function getBid(hand,history,dealer,me){
+  const det=decideBid(hand,history,dealer,me);
+  if(det.deterministic&&det.bid)return det;
+  return await aiBid(hand,history,dealer,me);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  DEAL GENERATIE
+// ════════════════════════════════════════════════════════════════════════
+function dealRandom(){
+  const deck=[];
+  for(const s of SUITS)for(const r of '23456789TJQKA')deck.push(s+r);
+  for(let i=deck.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[deck[i],deck[j]]=[deck[j],deck[i]];}
+  const hands={N:{S:'',H:'',D:'',C:''},E:{S:'',H:'',D:'',C:''},S:{S:'',H:'',D:'',C:''},W:{S:'',H:'',D:'',C:''}};
+  const order=['N','E','S','W'];
+  deck.forEach((card,i)=>{const seat=order[i%4],s=card[0],r=card[1];hands[seat][s]+=r;});
+  for(const seat of order)for(const s of SUITS)
+    hands[seat][s]=[...hands[seat][s]].sort((a,b)=>'23456789TJQKA'.indexOf(b)-'23456789TJQKA'.indexOf(a)).join('');
+  return hands;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  PBN PARSER  (handen als strings, deler/vulnerability behouden)
+// ════════════════════════════════════════════════════════════════════════
+function sortSuit(s){return [...s].sort((a,b)=>'23456789TJQKA'.indexOf(b)-'23456789TJQKA'.indexOf(a)).join('');}
+// parseer de [Auction] met commentaar gekoppeld aan elk bod
+function parseAuction(body,notes){
+  const bids=[],comments=[];
+  const tokens=body.replace(/\s+/g,' ').trim();
+  const re=/\{([^}]*)\}|(\S+)/g;let m,pending=null;
+  while((m=re.exec(tokens))!==null){
+    if(m[1]!==undefined){ // inline {comment} -> bij laatste bod
+      const t=m[1].trim();
+      if(bids.length)comments[bids.length-1]=(comments[bids.length-1]?comments[bids.length-1]+' ':'')+t;
+      continue;
+    }
+    let tok=m[2];
+    if(tok==='*')continue;
+    if(/^=\d+=$/.test(tok)){ // losse =N= -> bij laatste bod
+      const ni=+tok.replace(/=/g,'');
+      if(bids.length&&notes&&notes[ni]!==undefined)
+        comments[bids.length-1]=(comments[bids.length-1]?comments[bids.length-1]+' ':'')+notes[ni];
+      continue;
+    }
+    const nr=tok.match(/^(.+?)=(\d+)=$/); // bod=N=
+    if(nr){tok=nr[1];const ni=+nr[2];pending=(notes&&notes[ni]!==undefined)?notes[ni]:null;}
+    let bid=tok.replace(/^Pass$/i,'Pas').replace(/^AP$/i,'Pas')
+              .replace(/^Dbl$/i,'X').replace(/^Rdbl$/i,'XX').replace(/^XX$/i,'XX').replace(/^X$/i,'X');
+    // normaliseer kleurnotatie: 1NT blijft, 1H/1S etc blijven
+    bids.push(bid);
+    if(pending){comments[bids.length-1]=pending;pending=null;}
+  }
+  return{bids,comments};
+}
+function parsePbn(text){
+  const boards=[];
+  const parts=text.split(/(?=\[Board\s+")/).filter(p=>p.trim());
+  for(const part of parts){
+    const tags={};let m;
+    const tr=/\[(\w+)\s+"([^"]*)"\]/g;
+    while((m=tr.exec(part))!==null)tags[m[1]]=m[2];
+    if(!tags.Deal)continue;
+    // notes
+    const notes={};
+    const nr=/\[Note\s+"(\d+):([^"]*)"\]/g;
+    while((m=nr.exec(part))!==null)notes[parseInt(m[1])]=m[2];
+    // algemene comments (eerste { } blok buiten auction, voor beschrijving)
+    const comments=[];
+    const cr=/\{([^}]*)\}/g;while((m=cr.exec(part))!==null){const t=m[1].trim();if(t)comments.push(t);}
+    // auction
+    let auction=[],auctionComments=[],auctionDealer=tags.Dealer||'N';
+    const am=part.match(/\[Auction\s+"([NWES])"\]\s*([\s\S]*?)(?=\n\s*\[\w|\s*\*\s*$|$)/);
+    if(am){
+      auctionDealer=am[1];
+      const parsed=parseAuction(am[2],notes);
+      auction=parsed.bids;auctionComments=parsed.comments;
+    }
+    // Deal -> strings
+    const dm=tags.Deal.match(/^([NWES]):(\S+)\s+(\S+)\s+(\S+)\s+(\S+)$/);
+    const hands={N:{S:'',H:'',D:'',C:''},E:{S:'',H:'',D:'',C:''},S:{S:'',H:'',D:'',C:''},W:{S:'',H:'',D:'',C:''}};
+    if(dm){
+      const si='NWES'.indexOf(dm[1]);
+      const ord=('NWES'+'NWES').slice(si,si+4);
+      [dm[2],dm[3],dm[4],dm[5]].forEach((hs,i)=>{
+        hs.split('.').forEach((suit,j)=>{
+          hands[ord[i]][['S','H','D','C'][j]]=suit==='-'?'':sortSuit(suit.toUpperCase());
+        });
+      });
+    }
+    boards.push({
+      board:tags.Board||'?',event:tags.Event||'',
+      hands,dealer:auctionDealer,
+      vulnerable:tags.Vulnerable||'None',
+      origContract:tags.Contract||'',origDeclarer:tags.Declarer||'',
+      description:tags.Description||(auction.length?'':comments[0])||'',
+      auction,auctionComments,
+      hasAuction:auction.length>0,
+    });
+  }
+  return boards;
+}
+// uit een PBN-board: alleen wat de generatieve trainer nodig heeft
+function boardToDeal(b){return {deal:b.hands,dealer:b.dealer,vul:b.vulnerable,board:b};}
+
+// ════════════════════════════════════════════════════════════════════════
+//  GOOGLE DRIVE HELPERS  (directe REST met Bearer-token)
+// ════════════════════════════════════════════════════════════════════════
+async function driveGet(url,token){
+  const r=await fetch(url,{headers:{'Authorization':'Bearer '+token}});
+  if(!r.ok)throw new Error('Drive '+r.status);
+  return r.json();
+}
+async function buildTree(id,name,token){
+  const q=encodeURIComponent("'"+id+"' in parents and trashed=false");
+  const d=await driveGet('https://www.googleapis.com/drive/v3/files?q='+q+'&fields='+encodeURIComponent('files(id,name,mimeType)')+'&pageSize=1000&orderBy=name',token);
+  const items=d.files||[];
+  const folders=items.filter(f=>f.mimeType==='application/vnd.google-apps.folder');
+  const files=items.filter(f=>f.mimeType!=='application/vnd.google-apps.folder'&&f.name.toLowerCase().endsWith('.pbn'));
+  const node={id,name,files,children:[]};
+  for(const sub of folders)node.children.push(await buildTree(sub.id,sub.name,token));
+  return node;
+}
+async function downloadFile(id,token){
+  const r=await fetch('https://www.googleapis.com/drive/v3/files/'+id+'?alt=media',{headers:{'Authorization':'Bearer '+token}});
+  if(!r.ok)throw new Error('Download mislukt ('+r.status+')');
+  return r.text();
+}
+function extractBoards(txt){
+  const ms=[...txt.matchAll(/\[Board\s+"[^"]*"\]/g)];
+  if(!ms.length)return{pt:{},bs:[]};
+  const pre=txt.substring(0,ms[0].index);const pt={};
+  [...pre.matchAll(/\[(\w+)\s+"([^"]*)"\]/g)].forEach(m=>pt[m[1]]=m[2]);
+  const bs=ms.map((m,i)=>txt.substring(m.index,i+1<ms.length?ms[i+1].index:txt.length).trim());
+  return{pt,bs};
+}
+function combinePbn(files){
+  let r='% PBN 2.1\n% Biedtrainer\n\n';const all=[];
+  for(const f of files){const {pt,bs}=extractBoards(f.content);bs.forEach(b=>all.push({text:b,pt}));}
+  const keys=['Event','Site','Date','West','North','East','South','Scoring','Dealer','Vulnerable'];
+  all.forEach((b,i)=>{
+    let t=b.text.replace(/\[Board\s+"[^"]*"\]/,'[Board "'+(i+1)+'"]');
+    const present=new Set([...t.matchAll(/\[(\w+)\s+"/g)].map(m=>m[1]));
+    const pre=keys.filter(k=>!present.has(k)&&b.pt[k]!==undefined).map(k=>'['+k+' "'+b.pt[k]+'"]');
+    if(pre.length)t=pre.join('\n')+'\n'+t;
+    r+=t+'\n\n';
+  });
+  return r;
+}
+async function uploadToDrive(name,content,parentId,token){
+  const bd='---biedtrainer_'+Date.now();
+  const meta=JSON.stringify({name,parents:[parentId],mimeType:'text/plain'});
+  const body='\r\n--'+bd+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+meta+'\r\n--'+bd+'\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n'+content+'\r\n--'+bd+'--';
+  const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',{
+    method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'multipart/related; boundary='+bd},body
+  });
+  if(!r.ok)throw new Error('Upload mislukt ('+r.status+')');
+  return r.json();
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  UI COMPONENTEN
+// ════════════════════════════════════════════════════════════════════════
+function HandView({hand,hidden}){
+  if(hidden)return <div className="hidden-hand">♠ ?  ♥ ?  ♦ ?  ♣ ?</div>;
+  return(<div className="hand-row">
+    {SUITS.map(s=>(
+      <span className="suit" key={s}>
+        <span className={"sym "+((s==='H'||s==='D')?'red':'black')}>{SUIT_SYM[s]}</span>
+        <span className="cards">{hand[s]||'—'}</span>
+      </span>
+    ))}
+  </div>);
+}
+
+function EvalBar({hand,trump}){
+  const items=[
+    ['HP',hcp(hand)],['DP',distPoints(hand)],
+    ['FP',fitPoints(hand,trump)],['Verl.',losers(hand)],['Zar',zarPoints(hand)]
+  ];
+  return(<div className="eval">
+    {items.map(([l,v])=>(<div className="ev" key={l}><div className="v">{v}</div><div className="l">{l}</div></div>))}
+  </div>);
+}
+
+function bidCell(bid){
+  if(!bid)return <span style={{color:'#ccc'}}>·</span>;
+  if(bid==='Pas')return <span style={{color:'#4a6b3a'}}>Pas</span>;
+  if(bid==='X')return <span style={{color:'#8b1a1a',fontWeight:700}}>X</span>;
+  if(bid==='XX')return <span style={{color:'#2d4d8e',fontWeight:700}}>XX</span>;
+  const s=bidSuit(bid),lv=bidLevel(bid);
+  if(s==='NT')return <span className="bid-blk">{lv}SA</span>;
+  const red=(s==='H'||s==='D');
+  return <span className={red?'bid-red':'bid-blk'}>{lv}{SUIT_SYM[s]}</span>;
+}
+
+function AuctionTable({history,dealer,evals}){
+  const cols=['W','N','E','S'];
+  const offset=cols.indexOf(dealer);
+  const cells=[];
+  for(let i=0;i<offset;i++)cells.push({empty:true});
+  history.forEach((bid,i)=>cells.push({bid,seat:seatOf(dealer,i),eval:evals[i]}));
+  while(cells.length%4!==0)cells.push({pad:true});
+  const rows=[];for(let r=0;r<cells.length;r+=4)rows.push(cells.slice(r,r+4));
+  return(<div className="auc"><table>
+    <thead><tr>{cols.map(c=>(<th key={c}>{c==='S'?'Zuid':c==='N'?'Noord':c==='E'?'Oost':'West'}</th>))}</tr></thead>
+    <tbody>{rows.map((row,ri)=>(<tr key={ri}>{row.map((c,ci)=>(
+      <td key={ci} className={c.seat==='S'?'me':''}>
+        {c.empty||c.pad?'':bidCell(c.bid)}
+        {c.eval&&<span className={"fb "+(c.eval==='ok'?'fb-ok':c.eval==='no'?'fb-no':'fb-ai')}>
+          {c.eval==='ok'?'✓':c.eval==='no'?'✗':'·'}</span>}
+      </td>
+    ))}</tr>))}</tbody>
+  </table></div>);
+}
+
+function BidBox({onBid,minVal,canDouble,canRedouble}){
+  const grid=[];
+  for(let lv=1;lv<=7;lv++)for(const s of['C','D','H','S','NT']){
+    const bid=lv+s,val=(lv-1)*5+SUIT_RANK[s],off=val<=minVal;
+    grid.push(<button key={bid} className="bid-pill" disabled={off} onClick={()=>onBid(bid)}>
+      {lv}{s==='NT'?'SA':<span style={{color:(s==='H'||s==='D')?'#8b1a1a':'#1a1a2e'}}>{SUIT_SYM[s]}</span>}
+    </button>);
+  }
+  return(<div className="bidbox">
+    <div className="bb-grid">{grid}</div>
+    <div className="bb-special">
+      <button className="sp pas" onClick={()=>onBid('Pas')}>Pas</button>
+      <button className="sp dbl" disabled={!canDouble} onClick={()=>onBid('X')}>Doublet</button>
+      <button className="sp rdbl" disabled={!canRedouble} onClick={()=>onBid('XX')}>Redoublet</button>
+    </div>
+  </div>);
+}
+
+// Zuid-hand verticaal (kleuren onder elkaar)
+function ZuidVertical({hand}){
+  return(<div className="zuid-vert">
+    <div className="zh">Jouw hand — Zuid</div>
+    {SUITS.map(s=>(
+      <div className="zuid-suit" key={s}>
+        <span className={"sym "+((s==='H'||s==='D')?'red':'black')} style={{color:(s==='H'||s==='D')?'#8b1a1a':'#1a1a2e'}}>{SUIT_SYM[s]}</span>
+        <span>{hand[s]||'—'}</span>
+      </div>
+    ))}
+  </div>);
+}
+
+// Evaluatie verticaal (HP, DP, FP, Verliezers, Zar)
+function EvalVertical({hand,trump}){
+  const items=[['HP',hcp(hand)],['DP',distPoints(hand)],['FP',fitPoints(hand,trump)],['Verliezers',losers(hand)],['Zar',zarPoints(hand)]];
+  return(<div className="eval-vert">
+    {items.map(([l,v])=>(<div className="ev-row" key={l}><span className="l">{l}</span><span className="v">{v}</span></div>))}
+  </div>);
+}
+
+// Commentaarvak (toont commentaar bij de huidige biedstap)
+function CommentBox({comment,pending}){
+  return(<div className="comment-box">
+    <div className="cb-lbl">Commentaar bij dit bod</div>
+    {pending
+      ? <div className="cb-empty">Doe eerst je bod — het commentaar verschijnt daarna.</div>
+      : comment
+        ? <div className="cb-txt">{comment}</div>
+        : <div className="cb-empty">Geen commentaar bij dit bod.</div>}
+  </div>);
+}
+
+// Biedbox die een 'huidig bod' markeert (replay), klikbaar is (generatief of Zuid-beurt in replay)
+// wrongBid: laatst geprobeerd fout bod van Zuid -> rood gemarkeerd
+function BidBoxMarked({onBid,minVal,canDouble,canRedouble,currentBid,readOnly,wrongBid}){
+  const grid=[];
+  for(let lv=1;lv<=7;lv++)for(const s of['C','D','H','S','NT']){
+    const bid=lv+s,val=(lv-1)*5+SUIT_RANK[s],off=val<=minVal;
+    const isCur=currentBid===bid;
+    const isWrong=wrongBid===bid;
+    grid.push(<button key={bid} className={"bid-pill"+(isCur?' cur':'')+(isWrong?' wrong':'')} disabled={readOnly||off} onClick={()=>!readOnly&&onBid(bid)}>
+      {lv}{s==='NT'?'SA':<span style={{color:(isCur||isWrong)?'#fff':(s==='H'||s==='D')?'#8b1a1a':'#1a1a2e'}}>{SUIT_SYM[s]}</span>}
+    </button>);
+  }
+  const wrongStyle={outline:'3px solid #8b1a1a',outlineOffset:'1px',background:'#8b1a1a',color:'#fff'};
+  return(<div className="bidbox">
+    <div className="bb-grid">{grid}</div>
+    <div className="bb-special">
+      <button className="sp pas" style={wrongBid==='Pas'?wrongStyle:currentBid==='Pas'?{outline:'3px solid var(--gold)',outlineOffset:'1px'}:null} disabled={readOnly} onClick={()=>!readOnly&&onBid('Pas')}>Pas</button>
+      <button className="sp dbl" style={wrongBid==='X'?wrongStyle:currentBid==='X'?{outline:'3px solid var(--gold)'}:null} disabled={readOnly||!canDouble} onClick={()=>!readOnly&&onBid('X')}>Doublet</button>
+      <button className="sp rdbl" style={wrongBid==='XX'?wrongStyle:currentBid==='XX'?{outline:'3px solid var(--gold)'}:null} disabled={readOnly||!canRedouble} onClick={()=>!readOnly&&onBid('XX')}>Redoublet</button>
+    </div>
+  </div>);
+}
+
+// Compacte biedsequentie-tabel voor replay (klikbaar t/m huidige stap)
+// - Toekomstige biedingen (na de huidige stap) worden NIET getoond
+// - Een onopgeloste Zuid-stap toont '?' totdat Zuid goed biedt of ▶ indrukt
+function ReplaySeq({auction,comments,dealer,curStep,pending,onJump}){
+  const cols=['W','N','E','S'];
+  const offset=cols.indexOf(dealer);
+  const cells=[];
+  for(let i=0;i<offset;i++)cells.push({pad:true});
+  auction.forEach((bid,i)=>cells.push({bid,idx:i,com:!!comments[i]}));
+  while(cells.length%4!==0)cells.push({pad:true});
+  const rows=[];for(let r=0;r<cells.length;r+=4)rows.push(cells.slice(r,r+4));
+  return(<div className="replay-seq"><table>
+    <thead><tr>{cols.map(c=>(<th key={c}>{DNL(c)}</th>))}</tr></thead>
+    <tbody>{rows.map((row,ri)=>(<tr key={ri}>{row.map((c,ci)=>{
+      const isFuture=!c.pad&&c.idx>curStep;
+      const isPendingCell=!c.pad&&pending&&c.idx===curStep;
+      const clickable=!c.pad&&c.idx<=curStep&&!isPendingCell;
+      return(
+      <td key={ci}
+        className={(c.idx===curStep&&!pending?' cur':'')+(isPendingCell?' pending':'')+(isFuture?' future':'')+(c.com&&!isFuture&&!isPendingCell?' hascom':'')}
+        style={clickable?null:{cursor:'default'}}
+        onClick={()=>clickable&&onJump(c.idx)}>
+        {c.pad||isFuture?'':isPendingCell?'?':bidCell(c.bid)}
+      </td>
+      );
+    })}</tr>))}</tbody>
+  </table></div>);
+}
+
+// minimumbod-waarde uit de veiling
+function minBidValue(history){
+  for(let i=history.length-1;i>=0;i--){if(isRealBid(history[i]))return bidValue(history[i]);}
+  return -1;
+}
+// mag Zuid doubleren? (laatste echte bod door tegenpartij, nog niet gedoubleerd)
+function doubleState(history,dealer){
+  let lastRealIdx=-1;
+  for(let i=history.length-1;i>=0;i--)if(isRealBid(history[i])){lastRealIdx=i;break;}
+  if(lastRealIdx<0)return{canDouble:false,canRedouble:false};
+  const seat=seatOf(dealer,lastRealIdx);
+  const afterReal=history.slice(lastRealIdx+1).filter(b=>b==='X'||b==='XX');
+  const south='S';
+  const opp=isOpp(south,seat);
+  const alreadyDoubled=afterReal.includes('X');
+  const alreadyRedoubled=afterReal.includes('XX');
+  return{
+    canDouble:opp&&!alreadyDoubled&&!alreadyRedoubled,
+    canRedouble:!opp&&alreadyDoubled&&!alreadyRedoubled,
+  };
+}
+// is de veiling afgelopen? (3 passen na een bod, of 4 passen aan start)
+function auctionDone(history){
+  if(history.length<4)return false;
+  const last3=history.slice(-3);
+  const anyBid=history.some(isRealBid);
+  if(!anyBid)return history.length>=4&&history.slice(0,4).every(b=>b==='Pas');
+  return last3.length===3&&last3.every(b=>b==='Pas');
+}
+function finalContract(history,dealer){
+  let lastBid=null,lastIdx=-1;
+  for(let i=history.length-1;i>=0;i--)if(isRealBid(history[i])){lastBid=history[i];lastIdx=i;break;}
+  if(!lastBid)return{disp:'Allen gepast',trump:null,declarer:null};
+  const dbl=history.slice(lastIdx+1).filter(b=>b==='X'||b==='XX');
+  let suffix=dbl.includes('XX')?'XX':dbl.includes('X')?'X':'';
+  const suit=bidSuit(lastBid),lv=bidLevel(lastBid);
+  const disp=lv+(suit==='NT'?'SA':SUIT_SYM[suit])+suffix;
+  return{disp,trump:suit,bid:lastBid};
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  BIEDEN-TAB
+//  Twee modi:
+//   - REPLAY: een voorgeboden PBN-spel; biedingen + commentaar uit het document,
+//     vooruit/terug door de sequentie. Geen eigen bieden.
+//   - GENERATIEF: een geschud spel; Zuid biedt zelf, NOW bieden generatief.
+// ════════════════════════════════════════════════════════════════════════
+function BiedenTab({loadedBoard}){
+  const [mode,setMode]=useState('generatief'); // 'replay' | 'generatief'
+  const [deal,setDeal]=useState(()=>dealRandom());
+  const [dealer,setDealer]=useState('N');
+  const [vul,setVul]=useState('None');
+  const [boardInfo,setBoardInfo]=useState(null);
+
+  // GENERATIEF state
+  const [history,setHistory]=useState([]);
+  const [evals,setEvals]=useState([]);
+  const [feedback,setFeedback]=useState(null);
+  const [thinking,setThinking]=useState(false);
+  const [done,setDone]=useState(false);
+  const runId=useRef(0);
+
+  // REPLAY state
+  const [auction,setAuction]=useState([]);       // volledige veiling uit PBN
+  const [auctionComments,setAuctionComments]=useState([]);
+  const [step,setStep]=useState(0);              // index van het 'huidige' bod
+  const [pending,setPending]=useState(false);    // Zuid-stap nog niet opgelost ('?')
+  const [revealed,setRevealed]=useState(()=>new Set()); // opgeloste/onthulde Zuid-stappen
+  const [replayFb,setReplayFb]=useState(null);   // {status:'ok'|'no',bid} feedback op Zuid-bod
+
+  // ---- GENERATIEF ----
+  const evalBid=useCallback((d,seat,bid,hist,dlr)=>{
+    const r=decideBid(d[seat],hist,dlr,seat);
+    if(!r.deterministic||!r.bid)return'ai';
+    return r.bid.replace('Pass','Pas')===bid.replace('Pass','Pas')?'ok':'no';
+  },[]);
+  const runAuto=useCallback(async(d,dlr,startHist,startEvals,myRun)=>{
+    let hist=[...startHist],evs=[...startEvals];
+    setThinking(true);
+    while(true){
+      if(runId.current!==myRun)return;
+      if(auctionDone(hist))break;
+      const seat=seatOf(dlr,hist.length);
+      if(seat==='S')break;
+      const r=await getBid(d[seat],hist,dlr,seat);
+      if(runId.current!==myRun)return;
+      const ev=evalBid(d,seat,r.bid,hist,dlr);
+      hist=[...hist,r.bid];evs=[...evs,ev];
+      setHistory([...hist]);setEvals([...evs]);
+      await new Promise(res=>setTimeout(res,220));
+    }
+    setThinking(false);
+    if(auctionDone(hist))setDone(true);
+  },[evalBid]);
+
+  // start GENERATIEF op willekeurig spel
+  const startGeneratief=useCallback((d)=>{
+    const myRun=++runId.current;
+    setMode('generatief');
+    setDeal(d);setDealer('N');setVul('None');setBoardInfo(null);
+    setHistory([]);setEvals([]);setFeedback(null);setDone(false);setThinking(false);
+    setAuction([]);setAuctionComments([]);setStep(0);
+    setTimeout(()=>runAuto(d,'N',[],[],myRun),40);
+  },[runAuto]);
+
+  // start REPLAY op een geladen voorgeboden spel
+  const startReplay=useCallback((b)=>{
+    ++runId.current; // stop eventuele generatieve lus
+    setMode('replay');
+    setDeal(b.hands);setDealer(b.dealer);setVul(b.vulnerable);
+    setBoardInfo({event:b.event,description:b.description,board:b.board});
+    setAuction(b.auction||[]);setAuctionComments(b.auctionComments||[]);setStep(0);
+    setRevealed(new Set());setReplayFb(null);
+    setPending((b.auction||[]).length>0&&seatOf(b.dealer,0)==='S');
+    setThinking(false);setDone(false);setFeedback(null);
+  },[]);
+
+  React.useEffect(()=>{startGeneratief(deal);/*eslint-disable-next-line*/},[]);
+
+  React.useEffect(()=>{
+    if(!loadedBoard)return;
+    if(loadedBoard.hasAuction) startReplay(loadedBoard);
+    else { // geladen spel zonder veiling -> generatief op die handen
+      const myRun=++runId.current;
+      setMode('generatief');
+      setDeal(loadedBoard.hands);setDealer(loadedBoard.dealer);setVul(loadedBoard.vulnerable);
+      setBoardInfo({event:loadedBoard.event,description:loadedBoard.description,board:loadedBoard.board});
+      setHistory([]);setEvals([]);setFeedback(null);setDone(false);setThinking(false);
+      setAuction([]);setAuctionComments([]);setStep(0);
+      setTimeout(()=>runAuto(loadedBoard.hands,loadedBoard.dealer,[],[],myRun),40);
+    }
+    /*eslint-disable-next-line*/
+  },[loadedBoard]);
+
+  async function onSouthBid(bid){
+    if(mode!=='generatief')return;
+    const myRun=runId.current;
+    const ev=evalBid(deal,'S',bid,history,dealer);
+    const det=decideBid(deal.S,history,dealer,'S');
+    setFeedback({correct:ev==='ok',ai:ev==='ai',expected:det.bid,reason:det.reason});
+    const nh=[...history,bid],ne=[...evals,ev];
+    setHistory(nh);setEvals(ne);
+    if(auctionDone(nh)){setDone(true);return;}
+    await runAuto(deal,dealer,nh,ne,myRun);
+  }
+
+  // ---- afgeleide waarden per modus ----
+  const isReplay=mode==='replay';
+  // in replay: de "veiling tot en met de huidige stap" voor evaluatie/contract
+  const shownHistory=isReplay?auction.slice(0,step+1):history;
+  // in replay: baseer troef-evaluatie alleen op het al zichtbare deel van de veiling
+  // (de volledige veiling zou het eindcontract verraden)
+  const trumpForEval=useMemo(()=>{
+    const fc=finalContract(isReplay?shownHistory:history,dealer);return fc.trump;
+  },[isReplay,shownHistory,history,dealer]);
+
+  const curBidReplay=isReplay?auction[step]:null;
+  const curComment=isReplay?auctionComments[step]:null;
+  // is de replay volledig doorlopen? (laatste stap bereikt en opgelost)
+  const replayComplete=isReplay&&auction.length>0&&step>=auction.length-1&&!pending;
+
+  // biedbox-context (generatief: minimumbod + doublet; replay: markering)
+  const genMinVal=minBidValue(history);
+  const genDbl=doubleState(history,dealer);
+  const genCurSeat=seatOf(dealer,history.length);
+  const isSouthTurn=!isReplay&&genCurSeat==='S'&&!done;
+  const genFinal=useMemo(()=>finalContract(history,dealer),[history,dealer]);
+
+  // navigeer naar stap i: Zuid-stappen die nog niet zijn opgelost tonen '?'
+  function goToStep(i){
+    setStep(i);setReplayFb(null);
+    setPending(seatOf(dealer,i)==='S'&&!revealed.has(i));
+  }
+  function stepPrev(){if(step>0)goToStep(step-1);}
+  function stepNext(){
+    if(pending){ // vooruitknop bij open Zuid-stap = antwoord onthullen
+      setRevealed(r=>{const n=new Set(r);n.add(step);return n;});
+      setPending(false);setReplayFb(null);
+      return;
+    }
+    if(step<auction.length-1)goToStep(step+1);
+  }
+  // Zuid biedt zelf in replay-modus: vergelijk met het PBN-bod
+  function onReplaySouthBid(bid){
+    const target=auction[step];
+    if(bid===target){
+      setRevealed(r=>{const n=new Set(r);n.add(step);return n;});
+      setPending(false);
+      setReplayFb({status:'ok',bid});
+    }else{
+      setReplayFb({status:'no',bid}); // rood tonen, opnieuw proberen mag
+    }
+  }
+  // biedbox-context voor Zuid-beurt in replay
+  const replayMinVal=isReplay&&pending?minBidValue(auction.slice(0,step)):-1;
+  const replayDbl=isReplay&&pending?doubleState(auction.slice(0,step),dealer):{canDouble:false,canRedouble:false};
+
+  return(<div className="page">
+    <div className="topbar">
+      <h1 className="serif">Biedtrainer</h1>
+      <div className="sub">voor clubspelers</div>
+    </div>
+
+    {boardInfo&&(
+      <div className="status" style={{marginBottom:12}}>
+        <b>Spel {boardInfo.board}</b>{boardInfo.event?' · '+boardInfo.event:''} · deler {DNL(dealer)} · {vul}
+        {isReplay&&<span> · voorgeboden</span>}
+        {boardInfo.description&&<div style={{marginTop:4,fontStyle:'italic'}}>{boardInfo.description}</div>}
+      </div>
+    )}
+
+    {/* TWEE-KOLOMS LAYOUT: links Zuid+eval+commentaar, rechts biedbox/sequentie */}
+    <div className="bid-layout">
+      <div className="bl-left">
+        <ZuidVertical hand={deal.S}/>
+        <EvalVertical hand={deal.S} trump={trumpForEval}/>
+        {isReplay&&<CommentBox comment={pending?null:curComment} pending={pending}/>}
+      </div>
+
+      <div className="bl-right">
+        {isReplay?(<>
+          <ReplaySeq auction={auction} comments={auctionComments} dealer={dealer} curStep={step} pending={pending} onJump={goToStep}/>
+          <div className="replay-nav">
+            <button className="nav-arrow" onClick={stepPrev} disabled={step<=0}>◀</button>
+            <span className="step">
+              {pending
+                ? <>Bod {step+1} / {auction.length} — <b>Zuid: jouw beurt</b></>
+                : <>Bod {step+1} / {auction.length} — {DNL(seatOf(dealer,step))}</>}
+            </span>
+            <button className="nav-arrow" onClick={stepNext} disabled={!pending&&step>=auction.length-1} title={pending?'Antwoord tonen':'Volgende bod'}>▶</button>
+          </div>
+          {pending
+            ? <BidBoxMarked onBid={onReplaySouthBid} minVal={replayMinVal} canDouble={replayDbl.canDouble} canRedouble={replayDbl.canRedouble} currentBid={null} readOnly={false} wrongBid={replayFb&&replayFb.status==='no'?replayFb.bid:null}/>
+            : <BidBoxMarked currentBid={curBidReplay} readOnly={true} minVal={-1} canDouble={false} canRedouble={false} onBid={()=>{}}/>}
+        </>):(<>
+          {thinking&&<div className="status"><span className="thinking">●</span> {DNL(genCurSeat)} denkt na…</div>}
+          <AuctionTable history={history} dealer={dealer} evals={evals}/>
+          {isSouthTurn&&!thinking&&(
+            <BidBoxMarked onBid={onSouthBid} minVal={genMinVal} canDouble={genDbl.canDouble} canRedouble={genDbl.canRedouble} currentBid={null} readOnly={false}/>
+          )}
+        </>)}
+      </div>
+    </div>
+
+    {/* GENERATIEF: feedback + eindcontract onder de layout */}
+    {!isReplay&&feedback&&!done&&(
+      <div className={"fbbox "+(feedback.ai?'info':feedback.correct?'ok':'no')}>
+        <div className="lbl">{feedback.ai?'Geen vaste regel':feedback.correct?'Correct':'Afwijkend'}</div>
+        <div className="txt">
+          {feedback.ai
+            ? `Geen deterministische biedregel voor deze situatie — ${feedback.reason}.`
+            : feedback.correct
+              ? feedback.reason
+              : <>Het biedsysteem verwacht hier <b>{bidLabel(feedback.expected)}</b>. {feedback.reason}</>}
+        </div>
+      </div>
+    )}
+
+    {!isReplay&&done&&(<>
+      <div className="contract-badge serif">Eindcontract: {genFinal.disp}</div>
+      <div className="allhands">
+        {['N','E','S','W'].map(seat=>(
+          <div className="mini" key={seat}>
+            <div className="mh">{DNL(seat)} · {hcp(deal[seat])} HP</div>
+            <div className="ml">{SUITS.map(s=>(
+              <div key={s}><span style={{color:(s==='H'||s==='D')?'#8b1a1a':'#1a1a2e'}}>{SUIT_SYM[s]}</span> {deal[seat][s]||'—'}</div>
+            ))}</div>
+          </div>
+        ))}
+      </div>
+    </>)}
+
+    {/* REPLAY: feedback op het bod van Zuid */}
+    {isReplay&&replayFb&&(
+      <div className={"fbbox "+(replayFb.status==='ok'?'ok':'no')}>
+        <div className="lbl">{replayFb.status==='ok'?'Correct':'Afwijkend'}</div>
+        <div className="txt">
+          {replayFb.status==='ok'
+            ? <>Goed geboden: <b>{bidLabel(replayFb.bid)}</b> is het bod uit dit spel. Druk op ▶ om verder te gaan.</>
+            : <><b>{bidLabel(replayFb.bid)}</b> is niet het bod uit dit spel. Probeer opnieuw, of druk op ▶ om het antwoord te zien.</>}
+        </div>
+      </div>
+    )}
+
+    {/* REPLAY: eindcontract + alle handen pas tonen als de hele veiling is doorlopen */}
+    {isReplay&&replayComplete&&(<>
+      <div className="contract-badge serif" style={{marginTop:14}}>
+        Eindcontract: {finalContract(auction,dealer).disp}
+      </div>
+      <div className="allhands">
+        {['N','E','S','W'].map(seat=>(
+          <div className="mini" key={seat}>
+            <div className="mh">{DNL(seat)} · {hcp(deal[seat])} HP</div>
+            <div className="ml">{SUITS.map(s=>(
+              <div key={s}><span style={{color:(s==='H'||s==='D')?'#8b1a1a':'#1a1a2e'}}>{SUIT_SYM[s]}</span> {deal[seat][s]||'—'}</div>
+            ))}</div>
+          </div>
+        ))}
+      </div>
+    </>)}
+
+    <button className="btn full" onClick={()=>startGeneratief(dealRandom())} style={{marginTop:10}}>Nieuw geschud spel (zelf bieden)</button>
+  </div>);
+}
+
+function DNL(seat){return{N:'Noord',E:'Oost',S:'Zuid',W:'West'}[seat]||seat;}
+
+function bidLabel(bid){
+  if(!bid)return'—';
+  if(bid==='Pas')return'Pas';if(bid==='X')return'Doublet';if(bid==='XX')return'Redoublet';
+  const s=bidSuit(bid),lv=bidLevel(bid);
+  return lv+(s==='NT'?'SA':SUIT_SYM[s]);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  MAPPENBOOM
+// ════════════════════════════════════════════════════════════════════════
+function TreeNode({node,sel,onToggle,exp,onExp}){
+  const allIds=n=>[n.id,...n.children.flatMap(allIds)];
+  const allFiles=n=>[...n.files,...n.children.flatMap(allFiles)];
+  const isOn=sel.has(node.id);
+  const isHalf=!isOn&&allIds(node).some(id=>sel.has(id));
+  const isOpen=exp.has(node.id);
+  return(
+    <div className="tree-node">
+      <div className="tree-row" onClick={e=>{if(e.target.closest('.chk'))return;if(node.children.length)onExp(node.id);}}>
+        <span className={"tree-arrow"+(isOpen?' open':'')} style={{visibility:node.children.length?'visible':'hidden'}}>▶</span>
+        <div className={"chk"+(isOn?' on':'')+(isHalf?' half':'')} onClick={e=>{e.stopPropagation();onToggle(node,!isOn);}}/>
+        <span className="tree-name">{node.name}</span>
+        <span className="tree-count">{node.files.length>0&&node.files.length+' spellen'}</span>
+      </div>
+      {node.children.length>0&&isOpen&&(
+        <div className="tree-children">
+          {node.children.map(c=><TreeNode key={c.id} node={c} sel={sel} onToggle={onToggle} exp={exp} onExp={onExp}/>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  SPELLEN-TAB  (PBN laden via Drive-bestand, upload of plakken)
+// ════════════════════════════════════════════════════════════════════════
+function SpellenTab({accessToken,onConnect,onLoadBoard}){
+  const [driveFiles,setDriveFiles]=useState([]);
+  const [boards,setBoards]=useState([]);
+  const [srcName,setSrcName]=useState('');
+  const [activeIdx,setActiveIdx]=useState(null);
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState('');
+  const [pasteText,setPasteText]=useState('');
+
+  React.useEffect(()=>{
+    if(!accessToken)return;
+    setLoading(true);
+    driveGet('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent("name contains '.pbn' and trashed=false")+'&fields='+encodeURIComponent('files(id,name,modifiedTime)')+'&pageSize=50&orderBy=modifiedTime desc',accessToken)
+      .then(d=>setDriveFiles(d.files||[]))
+      .catch(()=>setError('Kon Drive-bestanden niet laden'))
+      .finally(()=>setLoading(false));
+  },[accessToken]);
+
+  function loadFromText(text,name){
+    try{
+      const bs=parsePbn(text);
+      if(!bs.length){setError('Geen geldige spellen gevonden in dit PBN');return;}
+      setBoards(bs);setSrcName(name);setActiveIdx(null);setError('');
+    }catch(e){setError('PBN-fout: '+e.message);}
+  }
+  async function loadDriveFile(f){
+    setLoading(true);setError('');
+    try{const text=await downloadFile(f.id,accessToken);loadFromText(text,f.name);}
+    catch(e){setError(e.message);}finally{setLoading(false);}
+  }
+  function onUpload(e){
+    const file=e.target.files&&e.target.files[0];if(!file)return;
+    const rd=new FileReader();rd.onload=()=>loadFromText(rd.result,file.name);rd.readAsText(file);
+  }
+  function pickBoard(i){setActiveIdx(i);onLoadBoard(boards[i]);}
+
+  return(<div className="page">
+    <div className="topbar"><h1 className="serif">Spellen laden</h1><div className="sub">PBN · Drive · bestand · plakken</div></div>
+
+    {/* Google Drive */}
+    <div className="card">
+      <div className="card-title">Google Drive</div>
+      <div className="card-sub">Kies een PBN-bestand uit je Drive</div>
+      {!accessToken
+        ? <button className="btn" onClick={onConnect}>Verbinden met Google →</button>
+        : (<>
+            {loading&&<div className="empty-note">Laden…</div>}
+            <div className="spel-list">
+              {driveFiles.map(f=>(
+                <div key={f.id} className="spel-item" onClick={()=>loadDriveFile(f)}>
+                  <div className="spel-title">{f.name}</div>
+                  <div className="spel-meta">{f.modifiedTime?new Date(f.modifiedTime).toLocaleDateString('nl-NL'):''}</div>
+                </div>
+              ))}
+              {!loading&&driveFiles.length===0&&<div className="empty-note">Geen PBN-bestanden gevonden in Drive.</div>}
+            </div>
+          </>)}
+    </div>
+
+    {/* Upload / plakken */}
+    <div className="card">
+      <div className="card-title">Eigen PBN</div>
+      <div className="card-sub">Upload een bestand of plak PBN-tekst</div>
+      <label className="btn sec" style={{cursor:'pointer',marginBottom:10,display:'inline-flex'}}>
+        Bestand kiezen
+        <input type="file" accept=".pbn,text/plain" style={{display:'none'}} onChange={onUpload}/>
+      </label>
+      <textarea rows={4} value={pasteText} onChange={e=>setPasteText(e.target.value)}
+        placeholder='[Board "1"][Dealer "N"][Deal "N:AKQ.432.765.JT98 ..."]' style={{marginBottom:8}}/>
+      <button className="btn" disabled={!pasteText.trim()} onClick={()=>loadFromText(pasteText,'Geplakt PBN')}>Tekst laden</button>
+    </div>
+
+    {error&&<div className="status err">{error}</div>}
+
+    {/* Spel-keuze */}
+    {boards.length>0&&(
+      <div className="card">
+        <div className="card-title">{srcName}</div>
+        <div className="card-sub">{boards.length} spellen — kies er één om te openen</div>
+        <div className="spel-list">
+          {boards.map((b,i)=>(
+            <div key={i} className={"spel-item"+(activeIdx===i?' active':'')} onClick={()=>pickBoard(i)}>
+              <div className="spel-nr">Spel {b.board}{b.hasAuction?' · voorgeboden':''}</div>
+              <div className="spel-title">{b.event||b.description||('Spel '+b.board)}</div>
+              <div className="spel-meta">
+                deler {DNL(b.dealer)} · {b.vulnerable}
+                {b.hasAuction?' · '+b.auction.length+' biedingen':' · zelf bieden'}
+                {activeIdx===i?' · ✓ geopend in Bieden-tab':''}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  GENERATOR-TAB  (mappenboom -> willekeurige set -> upload)
+// ════════════════════════════════════════════════════════════════════════
+function GeneratorTab({accessToken,onConnect,onDisconnect,gisLoaded,config,onOpenSettings}){
+  const [tree,setTree]=useState(null);
+  const [treeLoading,setTreeLoading]=useState(false);
+  const [sel,setSel]=useState(()=>new Set());
+  const [exp,setExp]=useState(()=>new Set());
+  const [numGames,setNumGames]=useState(12);
+  const [generating,setGenerating]=useState(false);
+  const [log,setLog]=useState([]);
+  const [error,setError]=useState('');
+  const [lastResult,setLastResult]=useState(null);
+
+  const allIds=n=>[n.id,...n.children.flatMap(allIds)];
+
+  const loadTree=useCallback(async()=>{
+    if(!config.rootFolderId||!accessToken)return;
+    setTreeLoading(true);setError('');
+    try{
+      const info=await driveGet('https://www.googleapis.com/drive/v3/files/'+config.rootFolderId+'?fields=id,name',accessToken);
+      const built=await buildTree(config.rootFolderId,info.name,accessToken);
+      setTree(built);setExp(new Set([built.id]));
+    }catch(e){setError(e.message);}finally{setTreeLoading(false);}
+  },[config.rootFolderId,accessToken]);
+
+  React.useEffect(()=>{if(accessToken&&config.rootFolderId&&!tree&&!treeLoading)loadTree();},[accessToken,config.rootFolderId,tree,treeLoading,loadTree]);
+
+  const toggleNode=(node,on)=>setSel(p=>{const n=new Set(p);allIds(node).forEach(id=>on?n.add(id):n.delete(id));return n;});
+  const toggleExp=id=>setExp(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
+
+  const stats=useMemo(()=>{
+    if(!tree)return{av:0,tot:0};
+    const walk=n=>{let a=sel.has(n.id)?n.files.length:0;n.children.forEach(c=>a+=walk(c));return a;};
+    const tot=n=>n.files.length+n.children.reduce((s,c)=>s+tot(c),0);
+    return{av:walk(tree),tot:tot(tree)};
+  },[tree,sel]);
+
+  async function generate(){
+    if(stats.av<numGames){setError('Te weinig ('+stats.av+') voor '+numGames+' spellen');return;}
+    setGenerating(true);setLog([]);setError('');setLastResult(null);
+    const add=(msg,k='')=>setLog(p=>[...p,{msg,k}]);
+    try{
+      add('Inventariseren…');
+      const pool=[];
+      const walk=n=>{if(sel.has(n.id))n.files.forEach(f=>pool.push({...f,cat:n.name}));n.children.forEach(walk);};
+      walk(tree);
+      const sh=[...pool];for(let i=sh.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[sh[i],sh[j]]=[sh[j],sh[i]];}
+      const picked=sh.slice(0,numGames);const downloads=[];
+      for(let i=0;i<picked.length;i++){
+        add('Download '+(i+1)+'/'+picked.length+': '+picked[i].name);
+        const content=await downloadFile(picked[i].id,accessToken);
+        downloads.push({name:picked[i].name,content});
+      }
+      add('Samenvoegen…');
+      const combined=combinePbn(downloads);
+      const ts=new Date();const p2=n=>String(n).padStart(2,'0');
+      const stamp=ts.getFullYear()+'-'+p2(ts.getMonth()+1)+'-'+p2(ts.getDate())+'_'+p2(ts.getHours())+p2(ts.getMinutes());
+      const filename='Competitie_'+numGames+'sp_'+stamp+'.pbn';
+      if(config.outputFolderId){
+        add('Upload: '+filename);
+        const result=await uploadToDrive(filename,combined,config.outputFolderId,accessToken);
+        setLastResult({name:filename,link:result.webViewLink});
+        add('Klaar — '+numGames+' spellen opgeslagen in Drive','ok');
+      }else{
+        // geen output-map: bied als download aan
+        const blob=new Blob([combined],{type:'text/plain'});
+        const url=URL.createObjectURL(blob);
+        setLastResult({name:filename,download:url});
+        add('Klaar — geen output-map ingesteld, download hieronder','ok');
+      }
+    }catch(e){add('Fout: '+e.message,'err');setError(e.message);}finally{setGenerating(false);}
+  }
+
+  return(<div className="page">
+    <div className="topbar"><h1 className="serif">Competitie</h1><div className="sub">Stel een set spellen samen</div></div>
+    <div className="row" style={{justifyContent:'space-between',marginBottom:14}}>
+      <div className={"pill"+(accessToken?'':' off')}><span className="dot"/>{accessToken?'Verbonden':'Niet verbonden'}</div>
+      <div className="row">
+        {accessToken
+          ?<button className="btn danger" onClick={onDisconnect}>Loskoppelen</button>
+          :<button className="btn" onClick={onConnect} disabled={!gisLoaded}>{gisLoaded?'Verbinden met Google':'Laden…'}</button>}
+        <button className="btn sec" onClick={onOpenSettings}>⚙</button>
+      </div>
+    </div>
+
+    {!accessToken&&<div className="card"><div className="card-title">Bibliotheek</div><p className="empty-note">Verbind met Google Drive om je bridge-bibliotheek te openen. Stel eerst je Client ID en root-map in via ⚙.</p></div>}
+    {accessToken&&!config.rootFolderId&&<div className="card"><div className="card-title">Geen root-map</div><p className="empty-note">Stel een root-map ID in via ⚙ om de bibliotheek te laden.</p></div>}
+    {accessToken&&treeLoading&&<div className="card"><div className="empty-note" style={{textAlign:'center'}}>Bibliotheek laden…</div></div>}
+
+    {accessToken&&tree&&(<>
+      <div className="card">
+        <div className="card-title">Bibliotheek</div>
+        <div className="card-sub">{stats.av} van {stats.tot} spellen geselecteerd</div>
+        <div className="row" style={{marginBottom:10}}>
+          <button className="btn sec" onClick={()=>setSel(new Set(allIds(tree)))}>Alles</button>
+          <button className="btn sec" onClick={()=>setSel(new Set())}>Niets</button>
+          <button className="btn sec" onClick={loadTree}>↺</button>
+        </div>
+        <TreeNode node={tree} sel={sel} onToggle={toggleNode} exp={exp} onExp={toggleExp}/>
+      </div>
+      <div className="card">
+        <div className="card-title">Aantal spellen</div>
+        <div className="games-grid">{[3,6,12,24].map(n=>(
+          <button key={n} className={"game-btn"+(numGames===n?' on':'')} onClick={()=>setNumGames(n)}>{n}<span>spellen</span></button>
+        ))}</div>
+        <button className="btn full" style={{marginTop:8}} onClick={generate} disabled={generating||stats.av<numGames}>{generating?'Bezig…':'Competitie samenstellen'}</button>
+        {log.length>0&&<div className="log">{log.map((l,i)=><div key={i} className={"log-line "+l.k}>{l.k==='ok'?'✓ ':l.k==='err'?'✗ ':'· '}{l.msg}</div>)}</div>}
+        {lastResult&&<div className="status ok" style={{marginTop:8}}><b>{lastResult.name}</b> {lastResult.link?<a href={lastResult.link} target="_blank" rel="noreferrer" style={{color:'var(--success)'}}>Openen ↗</a>:lastResult.download?<a href={lastResult.download} download={lastResult.name} style={{color:'var(--success)'}}>Downloaden ↓</a>:''}</div>}
+        {error&&<div className="status err" style={{marginTop:8}}>{error}</div>}
+      </div>
+    </>)}
+  </div>);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  INSTELLINGEN
+// ════════════════════════════════════════════════════════════════════════
+function Settings({config,onSave,onClose}){
+  const [cid,setCid]=useState(config.clientId||'');
+  const [rid,setRid]=useState(config.rootFolderId||'');
+  const [oid,setOid]=useState(config.outputFolderId||'');
+  return(<div className="page">
+    <div className="topbar"><h1 className="serif">Instellingen</h1><div className="sub">Google Drive koppeling</div></div>
+    <div className="card">
+      <div style={{marginBottom:14}}><span className="lbl">Google OAuth Client ID</span>
+        <input type="text" value={cid} onChange={e=>setCid(e.target.value)} placeholder="123…apps.googleusercontent.com"/></div>
+      <div style={{marginBottom:14}}><span className="lbl">Root-map ID (bibliotheek)</span>
+        <input type="text" value={rid} onChange={e=>setRid(e.target.value)} placeholder="1a2B3c…"/></div>
+      <div style={{marginBottom:18}}><span className="lbl">Output-map ID (optioneel)</span>
+        <input type="text" value={oid} onChange={e=>setOid(e.target.value)} placeholder="1a2B3c… (leeg = download i.p.v. upload)"/></div>
+      <div className="row">
+        <button className="btn" disabled={!cid} onClick={()=>onSave({clientId:cid.trim(),rootFolderId:rid.trim(),outputFolderId:oid.trim()})}>Opslaan</button>
+        {onClose&&<button className="btn sec" onClick={onClose}>Sluiten</button>}
+      </div>
+    </div>
+    <div className="card">
+      <div className="card-title">Toelichting</div>
+      <p className="empty-note">Alleen het <b>Client ID</b> is verplicht om met Drive te verbinden. De <b>root-map</b> is nodig voor de Competitie-generator. Een <b>output-map</b> is optioneel — zonder krijg je een download in plaats van een upload. Spellen plakken of uploaden in de Spellen-tab werkt zonder enige instelling.</p>
+    </div>
+  </div>);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  ROOT APP  (tabs via display:none/block voor state-behoud)
+// ════════════════════════════════════════════════════════════════════════
+function App(){
+  const [tab,setTab]=useState('bieden');
+  const [config,setConfig]=useState(()=>{
+    try{const s=localStorage.getItem('biedtrainerConfig');return s?JSON.parse(s):{clientId:'',rootFolderId:'',outputFolderId:''};}
+    catch(e){return{clientId:'',rootFolderId:'',outputFolderId:''};}
+  });
+  const [showSettings,setShowSettings]=useState(false);
+  const [accessToken,setAccessToken]=useState(null);
+  const [gisLoaded,setGisLoaded]=useState(false);
+  const [loadedBoard,setLoadedBoard]=useState(null);
+  const tokenClientRef=useRef(null);
+
+  // laad Google Identity Services
+  React.useEffect(()=>{
+    if(window.google&&window.google.accounts&&window.google.accounts.oauth2){setGisLoaded(true);return;}
+    const s=document.createElement('script');
+    s.src='https://accounts.google.com/gsi/client';s.async=true;s.defer=true;
+    s.onload=()=>setGisLoaded(true);
+    document.body.appendChild(s);
+  },[]);
+
+  React.useEffect(()=>{
+    if(!gisLoaded||!config.clientId)return;
+    try{
+      tokenClientRef.current=window.google.accounts.oauth2.initTokenClient({
+        client_id:config.clientId,
+        scope:'https://www.googleapis.com/auth/drive',
+        callback:resp=>{if(!resp.error)setAccessToken(resp.access_token);}
+      });
+    }catch(e){}
+  },[gisLoaded,config.clientId]);
+
+  function saveConfig(c){setConfig(c);try{localStorage.setItem('biedtrainerConfig',JSON.stringify(c));}catch(e){}setShowSettings(false);}
+  function connectGoogle(){
+    if(!config.clientId){setShowSettings(true);return;}
+    tokenClientRef.current&&tokenClientRef.current.requestAccessToken({prompt:'consent'});
+  }
+  function disconnectGoogle(){
+    if(accessToken&&window.google&&window.google.accounts&&window.google.accounts.oauth2)
+      window.google.accounts.oauth2.revoke(accessToken,()=>{});
+    setAccessToken(null);
+  }
+  function loadBoard(b){setLoadedBoard({...b,_ts:Date.now()});setTab('bieden');}
+
+  const tabs=[
+    {id:'bieden',ic:'♥',label:'Bieden'},
+    {id:'spellen',ic:'♦',label:'Spellen'},
+    {id:'generator',ic:'♣',label:'Competitie'},
+  ];
+
+  if(showSettings)
+    return <div><Settings config={config} onSave={saveConfig} onClose={config.clientId?()=>setShowSettings(false):null}/></div>;
+
+  return(<div>
+    <nav className="app-nav">
+      {tabs.map(t=>(
+        <button key={t.id} className={"nav-tab"+(tab===t.id?' active':'')} onClick={()=>setTab(t.id)}>
+          <span className="ic">{t.ic}</span>{t.label}
+        </button>
+      ))}
+      <button className="nav-tab gear" onClick={()=>setShowSettings(true)}><span className="ic">⚙</span></button>
+    </nav>
+
+    {/* display:none/block i.p.v. conditional rendering -> tab-state blijft behouden */}
+    <div style={{display:tab==='bieden'?'block':'none'}}>
+      <BiedenTab loadedBoard={loadedBoard}/>
+    </div>
+    <div style={{display:tab==='spellen'?'block':'none'}}>
+      <SpellenTab accessToken={accessToken} onConnect={connectGoogle} onLoadBoard={loadBoard}/>
+    </div>
+    <div style={{display:tab==='generator'?'block':'none'}}>
+      <GeneratorTab accessToken={accessToken} onConnect={connectGoogle} onDisconnect={disconnectGoogle}
+        gisLoaded={gisLoaded} config={config} onOpenSettings={()=>setShowSettings(true)}/>
+    </div>
+  </div>);
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
