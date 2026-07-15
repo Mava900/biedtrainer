@@ -569,8 +569,8 @@ function parsePbn(text){
     const dm=tags.Deal.match(/^([NWES]):(\S+)\s+(\S+)\s+(\S+)\s+(\S+)$/);
     const hands={N:{S:'',H:'',D:'',C:''},E:{S:'',H:'',D:'',C:''},S:{S:'',H:'',D:'',C:''},W:{S:'',H:'',D:'',C:''}};
     if(dm){
-      const si='NWES'.indexOf(dm[1]);
-      const ord=('NWES'+'NWES').slice(si,si+4);
+      const si='NESW'.indexOf(dm[1]);
+      const ord=('NESW'+'NESW').slice(si,si+4);
       [dm[2],dm[3],dm[4],dm[5]].forEach((hs,i)=>{
         hs.split('.').forEach((suit,j)=>{
           hands[ord[i]][['S','H','D','C'][j]]=suit==='-'?'':sortSuit(suit.toUpperCase());
@@ -801,9 +801,9 @@ function ReplaySeq({auction,comments,dealer,curStep,onJump}){
     <thead><tr>{cols.map(c=>(<th key={c}>{DNL(c)}</th>))}</tr></thead>
     <tbody>{rows.map((row,ri)=>(<tr key={ri}>{row.map((c,ci)=>(
       <td key={ci}
-        className={(c.pad?'':'')+(c.idx===curStep?' cur':'')+(c.idx>curStep?' future':'')+(c.com?' hascom':'')}
+        className={(c.pad?'':'')+(c.idx===curStep?' cur':'')+(c.idx>curStep?' future':'')+(c.com&&c.idx<=curStep?' hascom':'')}
         onClick={()=>!c.pad&&onJump(c.idx)}>
-        {c.pad?'':bidCell(c.bid)}
+        {c.pad?'':(c.idx>curStep?'\u00b7':bidCell(c.bid))}
       </td>
     ))}</tr>))}</tbody>
   </table></div>);
@@ -1040,8 +1040,8 @@ function BiedenTab({loadedBoard,competition,compIdx,onCompGo}){
       </div>
     </>)}
 
-    {/* REPLAY: alle handen onderaan (voorgeboden = bekend) + eindcontract */}
-    {isReplay&&(<>
+    {/* REPLAY: eindcontract + alle handen pas tonen als het laatste bod is bereikt (geen verklapper) */}
+    {isReplay&&step>=auction.length-1&&(<>
       <div className="contract-badge serif" style={{marginTop:14}}>
         Eindcontract: {finalContract(auction,dealer).disp}
       </div>
