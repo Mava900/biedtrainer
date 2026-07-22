@@ -615,18 +615,12 @@ function BidKeyboard({ onBid, minBidVal }) {
 
 // ── BIEDEN TAB ─────────────────────────────────────────────
 function BiedenTab({ board }) {
-  // step = index van het bod waar we nu op staan (0-based). -1 = nog niets getoond.
-  const [step, setStep] = useState(-1);
-  const [pendingBid, setPendingBid] = useState(null);   // Zuid's ingevoerde (goede) bod, in afwachting
-  const [wrongBid, setWrongBid] = useState(null);       // laatst foute bod van Zuid (rood)
-  const [revealed, setRevealed] = useState(false);      // antwoord onthuld zonder zelf te bieden
-  const [solvedSteps, setSolvedSteps] = useState({});   // {stepIdx: true} opgeloste Zuid-beurten
+  const [history, setHistory] = useState([]);
+  const [feedback, setFeedback] = useState(null);
+  const [done, setDone] = useState(false);
   const [score, setScore] = useState({c:0,t:0});
 
-  useEffect(()=>{
-    setStep(-1); setPendingBid(null); setWrongBid(null);
-    setRevealed(false); setSolvedSteps({}); setScore({c:0,t:0});
-  }, [board?.board]);
+  useEffect(()=>{ setHistory([]); setFeedback(null); setDone(false); setScore({c:0,t:0}); }, [board?.board]);
 
   if (!board) return (
     <div className="page">
@@ -637,89 +631,80 @@ function BiedenTab({ board }) {
     </div>
   );
 
-  const dirs=['N','E','S','W'];                 // klokvolgorde
+  const dirs=['N','E','S','W'];               // klokvolgorde (matcht index-parser)
   const dealerIdx=dirs.indexOf(board.auctionDealer);
-  const seatOf = i => dirs[(dealerIdx+i)%4];    // wie biedt op bod-index i
   const auction = board.auction || [];
   const comments = board.auctionComments || [];
-  const total = auction.length;
 
-  // Is de speler op bod-index i Zuid?
-  const isSouth = i => seatOf(i)==='S';
-  const curSeat = step>=0 ? seatOf(step) : null;
+  // Auto-advance non-Zuid biedingen totdat Zuid aan de beurt is (of bieding klaar)
+  function getAutoHistory(currentHistory) {
+    let h=[...currentHistory];
+    while (h.length < auction.length) {
+      const dir=dirs[(dealerIdx+h.length)%4];
+      if (dir==='S') break;
+      h.push(auction[h.length]);
+    }
+    return h;
+  }
 
-  // Op de HUIDIGE stap: is het een onopgeloste Zuid-beurt?
-  const atSouthTurn = step>=0 && step<total && isSouth(step) && !solvedSteps[step] && !revealed;
+  const startHistory = useMemo(()=>getAutoHistory([]),[board]);
+  const effectiveHistory = history.length===0 ? startHistory : history;
 
-  // Laatste echte bod vóór de huidige stap (voor keyboard-minimum)
+  const curIdx = effectiveHistory.length;
+  const curDir = dirs[(dealerIdx+curIdx)%4];
+  const isSouthTurn = curDir==='S' && curIdx < auction.length;
+  const auctionComplete = curIdx >= auction.length;
+
+  // Laatste echte bod voor keyboard-minimum
   const minBidVal = useMemo(()=>{
     const suits=['C','D','H','S','NT'];
-    for (let i=step-1;i>=0;i--){
-      const mm=(auction[i]||'').match(/^(\d)([SHDCNT]+)$/);
+    for (let i=effectiveHistory.length-1;i>=0;i--) {
+      const b=effectiveHistory[i];
+      const mm=(b||'').match(/^(\d)([SHDCNT]+)$/);
       if (mm) return (parseInt(mm[1])-1)*5+suits.indexOf(mm[2]);
     }
     return -1;
-  }, [step, board]);
+  }, [effectiveHistory]);
 
-  const auctionComplete = step>=total-1 && total>0 && !atSouthTurn;
-  const started = step>=0;
+  const norm = b => (b||'').replace('Pass','Pas').replace('Dbl','X').replace('Rdbl','XX');
 
-  // ── Navigatie ──
-  function goNext(){
-    // Als we op een onopgeloste Zuid-beurt staan: ▶ = antwoord onthullen
-    if (atSouthTurn){ setRevealed(true); return; }
-    setWrongBid(null); setRevealed(false); setPendingBid(null);
-    setStep(s=>Math.min(s+1, total-1));
-  }
-  function goPrev(){
-    setWrongBid(null); setRevealed(false); setPendingBid(null);
-    setStep(s=>Math.max(s-1, 0));
-  }
-  function goToStep(i){
-    setWrongBid(null); setRevealed(false); setPendingBid(null);
-    setStep(Math.max(0, Math.min(i, total-1)));
-  }
-  function begin(){ setStep(0); }
-
-  // ── Zuid biedt ──
-  function handleBid(bid){
-    const norm = b => (b||'').replace('Pass','Pas').replace('Dbl','X').replace('Rdbl','XX');
-    const expected = norm(auction[step]);
-    if (norm(bid)===expected){
-      setSolvedSteps(prev=>({...prev,[step]:true}));
-      setWrongBid(null);
-      setScore(s=>({c:s.c+1,t:s.t+1}));
-    } else {
-      setWrongBid(norm(bid));
-      setScore(s=>({c:s.c,t:s.t+1}));
-    }
+  function handleBid(bid) {
+    const idx = effectiveHistory.length;
+    const expected = auction[idx];
+    const correct = norm(bid)===norm(expected||'');
+    const newHistory = [...effectiveHistory, norm(expected||bid)];
+    setScore(s=>({c:s.c+(correct?1:0),t:s.t+1}));
+    setFeedback({correct, expected: norm(expected||''), chosen: norm(bid), idx});
+    const advanced = getAutoHistory(newHistory);
+    setHistory(advanced);
+    if (advanced.length >= auction.length) setDone(true);
   }
 
-  // ── Biedtabel opbouwen (NESW-kolommen) ──
+  function handleNext() {
+    setFeedback(null);
+    if (auctionComplete) setDone(true);
+  }
+
+  function reset() {
+    setHistory([]); setFeedback(null); setDone(false); setScore({c:0,t:0});
+  }
+
+  // Biedtabel (N-E-S-W kolommen)
   const colOrder=['N','E','S','W'];
   const offset = colOrder.indexOf(board.auctionDealer);
   const cells=[];
-  for (let i=0;i<offset;i++) cells.push({type:'empty'});
-  for (let i=0;i<total;i++){
-    if (i>step){ cells.push({type:'future'}); }                       // toekomstig -> verborgen
-    else if (i===step && atSouthTurn){
-      cells.push({type:'pending', wrong:wrongBid});                   // Zuid moet nog / net fout
-    } else {
-      cells.push({type:'bid', bid:auction[i], idx:i,
-                  cur:i===step, hascom:!!comments[i]});
-    }
-  }
-  while(cells.length%4!==0) cells.push({type:'empty'});
+  for (let i=0;i<offset;i++) cells.push(null);
+  effectiveHistory.forEach((b,i)=>cells.push({bid:b, idx:i}));
+  while(cells.length%4!==0) cells.push(null);
   const rows=[];
   for (let r=0;r<cells.length;r+=4) rows.push(cells.slice(r,r+4));
 
-  // Commentaar bij huidige stap — pas tonen als: geen open Zuid-beurt (opgelost/onthuld/geen Zuid)
-  const showComment = started && step<total &&
-    (!isSouth(step) || solvedSteps[step] || revealed) &&
-    comments[step];
-
   const { disp:contractDisp } = parseContract(board.contract);
   const note = board.notes[0] || board.description;
+
+  // Commentaar bij het laatst getoonde bod (index-model: per-bod auctionComments)
+  const lastIdx = effectiveHistory.length-1;
+  const feedbackComment = feedback ? comments[feedback.idx] : null;
 
   return (
     <div className="page" style={{paddingBottom:120}}>
@@ -730,140 +715,108 @@ function BiedenTab({ board }) {
       </div>
 
       {/* Leerdoel */}
-      {note && !auctionComplete && (
+      {note && !done && (
         <div className="fb info" style={{marginBottom:10}}>
           <div className="fb-lbl">Leerdoel</div>
           <div className="fb-text">{note}</div>
         </div>
       )}
 
-      {!started ? (
-        <div className="qbox">
-          <div className="qlbl">Replay</div>
-          <div className="qtxt">Stap door de bieding. Bij jouw beurt (Zuid) bied je zelf mee.</div>
-        </div>
-      ) : (
-        <>
-          {/* Biedtabel */}
-          <table className="bid-table">
-            <thead>
-              <tr>{colOrder.map(d=><th key={d}>{DNL[d][0]}</th>)}</tr>
-            </thead>
-            <tbody>
-              {rows.map((row,ri)=>(
-                <tr key={ri}>{row.map((c,ci)=>{
-                  if (c.type==='empty') return <td key={ci}></td>;
-                  if (c.type==='future') return <td key={ci} className="bid-hidden">·</td>;
-                  if (c.type==='pending'){
-                    if (c.wrong){
-                      const {text}=bidDisp(c.wrong);
-                      return <td key={ci} className="bid-cur bid-wrong">{text}</td>;
-                    }
-                    return <td key={ci} className="bid-cur" style={{color:'var(--gold)',fontSize:18}}>?</td>;
-                  }
-                  const {text,col}=bidDisp(c.bid);
-                  return (
-                    <td key={ci} className={c.cur?'bid-cur':''}>
-                      <span style={{color:col}}>{text}</span>
-                      {c.hascom && <span style={{color:'var(--felt)',fontSize:10,verticalAlign:'super'}}> •</span>}
-                    </td>
-                  );
-                })}</tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Biedtabel */}
+      <table className="bid-table">
+        <thead>
+          <tr>{colOrder.map(d=><th key={d}>{DNL[d][0]}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((row,ri)=>(
+            <tr key={ri}>{row.map((cell,ci)=>{
+              if (cell===null) return <td key={ci}></td>;
+              const isLatest = cell.idx===lastIdx;
+              const {text,col}=bidDisp(cell.bid);
+              const hascom = !!comments[cell.idx];
+              return (
+                <td key={ci} className={isLatest?'bid-cur':''}>
+                  <span style={{color:col}}>{text}</span>
+                  {hascom && <span style={{color:'var(--felt)',fontSize:10,verticalAlign:'super'}}> •</span>}
+                </td>
+              );
+            })}</tr>
+          ))}
+          {!auctionComplete && (
+            <tr>{colOrder.map((d,ci)=>{
+              const active=d===curDir;
+              return <td key={ci} className={active?'bid-cur':''} style={{color:'var(--gold)',fontSize:18}}>{active?'?':''}</td>;
+            })}</tr>
+          )}
+        </tbody>
+      </table>
 
-          {/* Navigatie ◀ ▶ onder de sequentie */}
-          <div className="replay-nav">
-            <button className="nav-arrow" onClick={goPrev} disabled={step<=0}>◀</button>
-            <span className="step">
-              {atSouthTurn
-                ? <>Bod {step+1} / {total} — <b>Zuid: jouw beurt</b></>
-                : <>Bod {step+1} / {total} — {DNL[seatOf(step)]}</>}
-            </span>
-            <button className="nav-arrow" onClick={goNext}
-              disabled={!atSouthTurn && step>=total-1}
-              title={atSouthTurn?'Antwoord tonen':'Volgende bod'}>▶</button>
-          </div>
-        </>
+      {/* Feedback */}
+      {feedback && (
+        <div className={`fb ${feedback.correct?'correct':'wrong'}`}>
+          <div className="fb-lbl">{feedback.correct?'✓ Correct!':'✗ Niet optimaal'}</div>
+          {!feedback.correct && (
+            <div className="fb-text">
+              Jij bood <strong style={{color:'#8b1a1a'}}>{bidDisp(feedback.chosen).text}</strong> maar het verwachte bod is <strong style={{color:'var(--felt)'}}>{bidDisp(feedback.expected).text}</strong>.
+            </div>
+          )}
+          {feedbackComment && (
+            <div className="fb-text" style={{marginTop:6,fontStyle:'italic'}}>{feedbackComment}</div>
+          )}
+        </div>
       )}
 
-      {/* Zuid-beurt: keyboard */}
-      {atSouthTurn && (
+      {/* Commentaar bij niet-Zuid bod (auto-gespeeld) */}
+      {!feedback && !done && lastIdx>=0 && comments[lastIdx] && (
+        <div className="bid-comment">
+          <div className="bc-lbl">Commentaar</div>
+          {comments[lastIdx]}
+        </div>
+      )}
+
+      {done && (
+        <div className="fb correct">
+          <div className="fb-lbl">✓ Bieding voltooid</div>
+          <div className="fb-text">Eindcontract: <strong>{contractDisp||'—'}</strong>{board.declarer && <> door {DNL[board.declarer]}</>}.{score.t>0 && <> Score: {score.c}/{score.t} correct.</>}</div>
+        </div>
+      )}
+
+      {/* Einde: alle handen */}
+      {done && (
+        <div className="card" style={{marginTop:10}}>
+          <div className="card-sub" style={{marginBottom:8}}>Alle handen</div>
+          <div className="all-hands">
+            {['N','E','S','W'].map(d=>(
+              <div key={d} className="hand-block" style={{marginBottom:8}}>
+                <div className="hand-name">{DNL[d]}</div>
+                <HandView dir={d} hand={board.hands[d]} compact />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard */}
+      {isSouthTurn && !feedback && !done && (
         <>
           <div className="qbox">
             <div className="qlbl">Jouw beurt — Zuid</div>
             <div className="qtxt">Wat is jouw bod?</div>
           </div>
-          {wrongBid && (
-            <div className="fb wrong">
-              <div className="fb-lbl">✗ Afwijkend — probeer opnieuw</div>
-              <div className="fb-text">Je bood <strong style={{color:'#8b1a1a'}}>{bidDisp(wrongBid).text}</strong>. Probeer een ander bod, of gebruik ▶ om het antwoord te tonen.</div>
-            </div>
-          )}
           <BidKeyboard onBid={handleBid} minBidVal={minBidVal} />
         </>
       )}
 
-      {/* Net opgelost / onthuld: bevestiging + commentaar */}
-      {started && step<total && isSouth(step) && (solvedSteps[step]||revealed) && (
-        <div className={`fb ${solvedSteps[step]?'correct':'info'}`}>
-          <div className="fb-lbl">{solvedSteps[step]?'✓ Correct':'Antwoord'}</div>
-          <div className="fb-text">
-            {DNL['S']} bood <strong style={{color:'var(--felt)'}}>{bidDisp(auction[step]).text}</strong>.
-          </div>
-        </div>
-      )}
-
-      {/* Commentaar bij huidig bod */}
-      {showComment && (
-        <div className="bid-comment">
-          <div className="bc-lbl">Commentaar</div>
-          {comments[step]}
-        </div>
-      )}
-
-      {/* Einde: contract + alle handen */}
-      {auctionComplete && (
-        <>
-          <div className="fb correct">
-            <div className="fb-lbl">✓ Bieding voltooid</div>
-            <div className="fb-text">
-              Eindcontract: <strong>{contractDisp||'—'}</strong>
-              {board.declarer && <> door {DNL[board.declarer]}</>}.
-              {score.t>0 && <> Score: {score.c}/{score.t} correct.</>}
-            </div>
-          </div>
-          <div className="card" style={{marginTop:10}}>
-            <div className="card-sub" style={{marginBottom:8}}>Alle handen</div>
-            <div className="all-hands">
-              {['N','E','S','W'].map(d=>(
-                <div key={d} className="hand-block" style={{marginBottom:8}}>
-                  <div className="hand-name">{DNL[d]}</div>
-                  <HandView dir={d} hand={board.hands[d]} compact />
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Onderbalk */}
       <div className="bot-nav">
-        {!started && (
-          <button className="btn" style={{flex:1}} onClick={begin}>Start bieding →</button>
+        <button className="btn sec" style={{flex:1}} onClick={reset}>↺ Opnieuw</button>
+        {feedback && !done && (
+          <button className="btn" style={{flex:2}} onClick={handleNext}>Volgende →</button>
         )}
-        {started && (
-          <button className="btn sec" style={{flex:1}} onClick={()=>{
-            setStep(-1); setPendingBid(null); setWrongBid(null);
-            setRevealed(false); setSolvedSteps({}); setScore({c:0,t:0});
-          }}>↺ Opnieuw</button>
+        {done && (
+          <button className="btn" style={{flex:2}} onClick={reset}>↺ Herspeel</button>
         )}
-        {started && !auctionComplete && (
-          <button className="btn" style={{flex:2}} onClick={goNext}
-            disabled={!atSouthTurn && step>=total-1}>
-            {atSouthTurn ? 'Antwoord tonen →' : 'Volgende →'}
-          </button>
+        {!isSouthTurn && !feedback && !done && !auctionComplete && (
+          <button className="btn" style={{flex:2}} onClick={()=>setHistory(getAutoHistory(effectiveHistory))}>Doorgaan →</button>
         )}
       </div>
     </div>
