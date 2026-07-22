@@ -96,6 +96,15 @@ input[type=text]:focus{outline:none;border-color:var(--felt);background:#fff;}
 .bid-table th{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 4px;text-align:center;border-bottom:1px solid var(--line);background:var(--paper-deep);}
 .bid-table td{padding:6px 4px;text-align:center;font-size:16px;font-weight:700;}
 .bid-cur{background:rgba(176,141,63,.15);}
+.bid-wrong{background:#fdecec;color:#8b1a1a!important;}
+.bid-hidden{color:var(--line);}
+.replay-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:8px 0 4px;}
+.replay-nav .nav-arrow{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:18px;color:var(--felt);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.replay-nav .nav-arrow:hover:not(:disabled){background:var(--paper-deep);border-color:var(--felt);}
+.replay-nav .nav-arrow:disabled{opacity:.3;cursor:default;}
+.replay-nav .step{font-size:13px;color:var(--ink-soft);min-width:140px;text-align:center;font-variant-numeric:tabular-nums;}
+.bid-comment{background:#f4f0e8;border-left:3px solid var(--felt);padding:10px 14px;border-radius:0 3px 3px 0;margin:10px 0;font-size:14px;line-height:1.6;color:var(--ink-soft);}
+.bid-comment .bc-lbl{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--felt);margin-bottom:4px;}
 .bid-keyboard{background:#fffdf7;border:1px solid var(--line);border-radius:3px;overflow:hidden;margin-top:10px;}
 .bkrow{display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--line-soft);}
 .bkrow:last-child{border-bottom:none;}
@@ -447,7 +456,7 @@ function parseContract(c) {
 }
 
 function trickWinner(cards, leader) {
-  const dirs = ['N','W','E','S'];
+  const dirs = ['N','E','S','W'];
   const li = dirs.indexOf(leader);
   const order = [...dirs.slice(li),...dirs.slice(0,li)];
   const led = cards[0][0];
@@ -459,6 +468,35 @@ function trickWinner(cards, leader) {
 }
 
 // ── PBN PARSER ─────────────────────────────────────────────
+// Parse [Auction] body, koppelt commentaar (inline {} en =N= note-refs) per bod-index
+function parseAuction(body, notes){
+  const bids=[], comments=[];
+  const tokens=body.replace(/\s+/g,' ').trim();
+  const re=/\{([^}]*)\}|(\S+)/g; let m;
+  while((m=re.exec(tokens))!==null){
+    if(m[1]!==undefined){ // inline {comment} -> hoort bij LAATSTE bod
+      const t=m[1].trim();
+      if(bids.length) comments[bids.length-1]=(comments[bids.length-1]?comments[bids.length-1]+' ':'')+t;
+      continue;
+    }
+    let tok=m[2];
+    if(tok==='*') continue;
+    if(/^=\d+=$/.test(tok)){ // losse =N= -> hoort bij LAATSTE bod
+      const ni=+tok.replace(/=/g,'');
+      if(bids.length && notes && notes[ni]!==undefined)
+        comments[bids.length-1]=(comments[bids.length-1]?comments[bids.length-1]+' ':'')+notes[ni];
+      continue;
+    }
+    const nr=tok.match(/^(.+?)=(\d+)=$/); // bod met aangeplakte =N=
+    let attachedNote=null;
+    if(nr){ tok=nr[1]; const ni=+nr[2]; if(notes&&notes[ni]!==undefined) attachedNote=notes[ni]; }
+    const bid=tok.replace(/^Pass$/i,'Pas').replace(/^AP$/i,'Pas').replace(/^Dbl$/i,'X').replace(/^Rdbl$/i,'XX');
+    bids.push(bid);
+    if(attachedNote) comments[bids.length-1]=attachedNote;
+  }
+  return { bids, comments };
+}
+
 function parsePbn(text) {
   const boards = [];
   const parts = text.split(/(?=\[Board\s+")/).filter(p => p.trim());
@@ -470,15 +508,17 @@ function parsePbn(text) {
     const notes = {};
     const nr = /\[Note\s+"(\d+):([^"]*)"\]/g;
     while ((m=nr.exec(part))!==null) notes[parseInt(m[1])]=m[2];
-    let auction=[], auctionDealer=tags.Dealer||'W';
-    const am = part.match(/\[Auction\s+"([NWES])"\]([\s\S]*?)(?=\n\[|\*\s*\n|\*\s*$)/);
+    let auction=[], auctionComments=[], auctionDealer=tags.Dealer||'W';
+    const am = part.match(/\[Auction\s+"([NWES])"\]([\s\S]*?)(?=\n\s*\[|\n\s*\*|\*\s*$|$)/);
     if (am) {
       auctionDealer=am[1];
-      auction=am[2].replace(/\{[^}]*\}/g,'').trim().split(/\s+/).filter(b=>b&&b!=='*');
+      const parsed=parseAuction(am[2], notes);
+      auction=parsed.bids;
+      auctionComments=parsed.comments;
     }
     const playComments={};
     let play=[], playLeader=tags.Declarer?getLHO(tags.Declarer):'W';
-    const pm = part.match(/\[Play\s+"([NWES])"\]([\s\S]*?)(?=\n\[|\*\s*\n|\*\s*$)/);
+    const pm = part.match(/\[Play\s+"([NWES])"\]([\s\S]*?)(?=\n\s*\[|\n\s*\*|\*\s*$|$)/);
     if (pm) {
       playLeader=pm[1];
       const lines=pm[2].split('\n'); let ti=0;
@@ -496,8 +536,8 @@ function parsePbn(text) {
     const dm = tags.Deal.match(/^([NWES]):([\S]+)\s+([\S]+)\s+([\S]+)\s+([\S]+)$/);
     let hands={N:{S:[],H:[],D:[],C:[]},W:{S:[],H:[],D:[],C:[]},E:{S:[],H:[],D:[],C:[]},S:{S:[],H:[],D:[],C:[]}};
     if (dm) {
-      const si='NWES'.indexOf(dm[1]);
-      const ord=('NWES'+'NWES').slice(si,si+4);
+      const si='NESW'.indexOf(dm[1]);
+      const ord=('NESW'+'NESW').slice(si,si+4);
       [dm[2],dm[3],dm[4],dm[5]].forEach((hs,i)=>{
         hs.split('.').forEach((s,j)=>{
           hands[ord[i]][['S','H','D','C'][j]]=s==='-'?[]:s.toUpperCase().split('');
@@ -508,7 +548,7 @@ function parsePbn(text) {
       board:tags.Board||'?', event:tags.Event||'',
       hands, declarer:tags.Declarer||'S', contract:tags.Contract||'',
       vulnerable:tags.Vulnerable||'None',
-      auction, auctionDealer, play, playLeader, playComments, notes,
+      auction, auctionComments, auctionDealer, play, playLeader, playComments, notes,
       description:tags.Description||notes[0]||'',
     });
   }
@@ -575,12 +615,18 @@ function BidKeyboard({ onBid, minBidVal }) {
 
 // ── BIEDEN TAB ─────────────────────────────────────────────
 function BiedenTab({ board }) {
-  const [history, setHistory] = useState([]);
-  const [feedback, setFeedback] = useState(null);
-  const [done, setDone] = useState(false);
+  // step = index van het bod waar we nu op staan (0-based). -1 = nog niets getoond.
+  const [step, setStep] = useState(-1);
+  const [pendingBid, setPendingBid] = useState(null);   // Zuid's ingevoerde (goede) bod, in afwachting
+  const [wrongBid, setWrongBid] = useState(null);       // laatst foute bod van Zuid (rood)
+  const [revealed, setRevealed] = useState(false);      // antwoord onthuld zonder zelf te bieden
+  const [solvedSteps, setSolvedSteps] = useState({});   // {stepIdx: true} opgeloste Zuid-beurten
   const [score, setScore] = useState({c:0,t:0});
 
-  useEffect(()=>{ setHistory([]); setFeedback(null); setDone(false); setScore({c:0,t:0}); }, [board?.board]);
+  useEffect(()=>{
+    setStep(-1); setPendingBid(null); setWrongBid(null);
+    setRevealed(false); setSolvedSteps({}); setScore({c:0,t:0});
+  }, [board?.board]);
 
   if (!board) return (
     <div className="page">
@@ -591,71 +637,86 @@ function BiedenTab({ board }) {
     </div>
   );
 
-  const dirs=['N','W','E','S'];
+  const dirs=['N','E','S','W'];                 // klokvolgorde
   const dealerIdx=dirs.indexOf(board.auctionDealer);
+  const seatOf = i => dirs[(dealerIdx+i)%4];    // wie biedt op bod-index i
+  const auction = board.auction || [];
+  const comments = board.auctionComments || [];
+  const total = auction.length;
 
-  // Auto-advance non-South bids to get starting history
-  function getAutoHistory(currentHistory) {
-    let h=[...currentHistory];
-    while (h.length < board.auction.length) {
-      const dir=dirs[(dealerIdx+h.length)%4];
-      if (dir==='S') break;
-      h.push(board.auction[h.length]);
-    }
-    return h;
-  }
+  // Is de speler op bod-index i Zuid?
+  const isSouth = i => seatOf(i)==='S';
+  const curSeat = step>=0 ? seatOf(step) : null;
 
-  // Initialize: auto-play bids before South's first turn
-  const startHistory = useMemo(()=>getAutoHistory([]),[board]);
-  const effectiveHistory = history.length===0 ? startHistory : history;
+  // Op de HUIDIGE stap: is het een onopgeloste Zuid-beurt?
+  const atSouthTurn = step>=0 && step<total && isSouth(step) && !solvedSteps[step] && !revealed;
 
-  const curIdx = effectiveHistory.length;
-  const curDir = dirs[(dealerIdx+curIdx)%4];
-  const isSouthTurn = curDir==='S' && curIdx < board.auction.length;
-  const auctionComplete = curIdx >= board.auction.length;
-
-  // Last real bid value for keyboard
+  // Laatste echte bod vóór de huidige stap (voor keyboard-minimum)
   const minBidVal = useMemo(()=>{
     const suits=['C','D','H','S','NT'];
-    for (let i=effectiveHistory.length-1;i>=0;i--) {
-      const b=effectiveHistory[i];
-      const mm=b.match(/^(\d)([SHDCNT]+)$/);
+    for (let i=step-1;i>=0;i--){
+      const mm=(auction[i]||'').match(/^(\d)([SHDCNT]+)$/);
       if (mm) return (parseInt(mm[1])-1)*5+suits.indexOf(mm[2]);
     }
     return -1;
-  }, [effectiveHistory]);
+  }, [step, board]);
 
-  function handleBid(bid) {
-    const expected = board.auction[effectiveHistory.length];
-    const norm = b => b.replace('Pass','Pas').replace('Dbl','X').replace('Rdbl','XX');
-    const correct = norm(bid)===norm(expected||'');
-    const newHistory = [...effectiveHistory, norm(expected||bid)];
-    setScore(s=>({c:s.c+(correct?1:0),t:s.t+1}));
-    setFeedback({correct, expected: norm(expected||''), chosen: norm(bid)});
-    // Auto-advance after
-    const advanced = getAutoHistory(newHistory);
-    setHistory(advanced);
-    if (advanced.length >= board.auction.length) setDone(true);
+  const auctionComplete = step>=total-1 && total>0 && !atSouthTurn;
+  const started = step>=0;
+
+  // ── Navigatie ──
+  function goNext(){
+    // Als we op een onopgeloste Zuid-beurt staan: ▶ = antwoord onthullen
+    if (atSouthTurn){ setRevealed(true); return; }
+    setWrongBid(null); setRevealed(false); setPendingBid(null);
+    setStep(s=>Math.min(s+1, total-1));
+  }
+  function goPrev(){
+    setWrongBid(null); setRevealed(false); setPendingBid(null);
+    setStep(s=>Math.max(s-1, 0));
+  }
+  function goToStep(i){
+    setWrongBid(null); setRevealed(false); setPendingBid(null);
+    setStep(Math.max(0, Math.min(i, total-1)));
+  }
+  function begin(){ setStep(0); }
+
+  // ── Zuid biedt ──
+  function handleBid(bid){
+    const norm = b => (b||'').replace('Pass','Pas').replace('Dbl','X').replace('Rdbl','XX');
+    const expected = norm(auction[step]);
+    if (norm(bid)===expected){
+      setSolvedSteps(prev=>({...prev,[step]:true}));
+      setWrongBid(null);
+      setScore(s=>({c:s.c+1,t:s.t+1}));
+    } else {
+      setWrongBid(norm(bid));
+      setScore(s=>({c:s.c,t:s.t+1}));
+    }
   }
 
-  function handleNext() {
-    setFeedback(null);
-    if (auctionComplete) setDone(true);
-  }
-
-  function reset() {
-    setHistory([]); setFeedback(null); setDone(false); setScore({c:0,t:0});
-  }
-
-  // Build bid table
-  const colOrder=['W','N','E','S'];
+  // ── Biedtabel opbouwen (NESW-kolommen) ──
+  const colOrder=['N','E','S','W'];
   const offset = colOrder.indexOf(board.auctionDealer);
   const cells=[];
-  for (let i=0;i<offset;i++) cells.push(null);
-  effectiveHistory.forEach(b=>cells.push(b));
-  while(cells.length%4!==0) cells.push(null);
+  for (let i=0;i<offset;i++) cells.push({type:'empty'});
+  for (let i=0;i<total;i++){
+    if (i>step){ cells.push({type:'future'}); }                       // toekomstig -> verborgen
+    else if (i===step && atSouthTurn){
+      cells.push({type:'pending', wrong:wrongBid});                   // Zuid moet nog / net fout
+    } else {
+      cells.push({type:'bid', bid:auction[i], idx:i,
+                  cur:i===step, hascom:!!comments[i]});
+    }
+  }
+  while(cells.length%4!==0) cells.push({type:'empty'});
   const rows=[];
   for (let r=0;r<cells.length;r+=4) rows.push(cells.slice(r,r+4));
+
+  // Commentaar bij huidige stap — pas tonen als: geen open Zuid-beurt (opgelost/onthuld/geen Zuid)
+  const showComment = started && step<total &&
+    (!isSouth(step) || solvedSteps[step] || revealed) &&
+    comments[step];
 
   const { disp:contractDisp } = parseContract(board.contract);
   const note = board.notes[0] || board.description;
@@ -668,81 +729,141 @@ function BiedenTab({ board }) {
         <HandView dir="S" hand={board.hands.S} />
       </div>
 
-      {/* Info */}
-      {note && !done && (
+      {/* Leerdoel */}
+      {note && !auctionComplete && (
         <div className="fb info" style={{marginBottom:10}}>
           <div className="fb-lbl">Leerdoel</div>
           <div className="fb-text">{note}</div>
         </div>
       )}
 
-      {/* Bid table */}
-      <table className="bid-table">
-        <thead>
-          <tr>{colOrder.map(d=><th key={d}>{DNL[d][0]}</th>)}</tr>
-        </thead>
-        <tbody>
-          {rows.map((row,ri)=>(
-            <tr key={ri}>{row.map((bid,ci)=>{
-              const isLatest = ri*4+ci===effectiveHistory.length-1;
-              const {text,col}=bidDisp(bid);
-              return <td key={ci} className={isLatest?'bid-cur':''}>{bid!==null?<span style={{color:col}}>{text}</span>:''}</td>;
-            })}</tr>
-          ))}
-          {!auctionComplete && (
-            <tr>{colOrder.map((d,ci)=>{
-              const active=d===curDir;
-              return <td key={ci} className={active?'bid-cur':''} style={{color:'var(--gold)',fontSize:18}}>{active?'?':''}</td>;
-            })}</tr>
-          )}
-        </tbody>
-      </table>
-
-      {/* Feedback */}
-      {feedback && (
-        <div className={`fb ${feedback.correct?'correct':'wrong'}`}>
-          <div className="fb-lbl">{feedback.correct?'✓ Correct!':'✗ Niet optimaal'}</div>
-          {!feedback.correct && (
-            <div className="fb-text">
-              Jij bood <strong style={{color:'#8b1a1a'}}>{bidDisp(feedback.chosen).text}</strong> maar het verwachte bod is <strong style={{color:'var(--felt)'}}>{bidDisp(feedback.expected).text}</strong>.
-            </div>
-          )}
-          {/* Show note for this bid step */}
-          {board.notes[effectiveHistory.length] && (
-            <div className="fb-text" style={{marginTop:6,fontStyle:'italic'}}>{board.notes[effectiveHistory.length]}</div>
-          )}
+      {!started ? (
+        <div className="qbox">
+          <div className="qlbl">Replay</div>
+          <div className="qtxt">Stap door de bieding. Bij jouw beurt (Zuid) bied je zelf mee.</div>
         </div>
+      ) : (
+        <>
+          {/* Biedtabel */}
+          <table className="bid-table">
+            <thead>
+              <tr>{colOrder.map(d=><th key={d}>{DNL[d][0]}</th>)}</tr>
+            </thead>
+            <tbody>
+              {rows.map((row,ri)=>(
+                <tr key={ri}>{row.map((c,ci)=>{
+                  if (c.type==='empty') return <td key={ci}></td>;
+                  if (c.type==='future') return <td key={ci} className="bid-hidden">·</td>;
+                  if (c.type==='pending'){
+                    if (c.wrong){
+                      const {text}=bidDisp(c.wrong);
+                      return <td key={ci} className="bid-cur bid-wrong">{text}</td>;
+                    }
+                    return <td key={ci} className="bid-cur" style={{color:'var(--gold)',fontSize:18}}>?</td>;
+                  }
+                  const {text,col}=bidDisp(c.bid);
+                  return (
+                    <td key={ci} className={c.cur?'bid-cur':''}>
+                      <span style={{color:col}}>{text}</span>
+                      {c.hascom && <span style={{color:'var(--felt)',fontSize:10,verticalAlign:'super'}}> •</span>}
+                    </td>
+                  );
+                })}</tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Navigatie ◀ ▶ onder de sequentie */}
+          <div className="replay-nav">
+            <button className="nav-arrow" onClick={goPrev} disabled={step<=0}>◀</button>
+            <span className="step">
+              {atSouthTurn
+                ? <>Bod {step+1} / {total} — <b>Zuid: jouw beurt</b></>
+                : <>Bod {step+1} / {total} — {DNL[seatOf(step)]}</>}
+            </span>
+            <button className="nav-arrow" onClick={goNext}
+              disabled={!atSouthTurn && step>=total-1}
+              title={atSouthTurn?'Antwoord tonen':'Volgende bod'}>▶</button>
+          </div>
+        </>
       )}
 
-      {done && (
-        <div className="fb correct">
-          <div className="fb-lbl">✓ Bieding voltooid</div>
-          <div className="fb-text">Eindcontract: <strong>{contractDisp}</strong> door {DNL[board.declarer]}. Score: {score.c}/{score.t} correct.</div>
-          {board.notes[0] && <div className="fb-text" style={{marginTop:6,fontStyle:'italic'}}>{board.notes[0]}</div>}
-        </div>
-      )}
-
-      {/* Keyboard */}
-      {isSouthTurn && !feedback && !done && (
+      {/* Zuid-beurt: keyboard */}
+      {atSouthTurn && (
         <>
           <div className="qbox">
             <div className="qlbl">Jouw beurt — Zuid</div>
             <div className="qtxt">Wat is jouw bod?</div>
           </div>
+          {wrongBid && (
+            <div className="fb wrong">
+              <div className="fb-lbl">✗ Afwijkend — probeer opnieuw</div>
+              <div className="fb-text">Je bood <strong style={{color:'#8b1a1a'}}>{bidDisp(wrongBid).text}</strong>. Probeer een ander bod, of gebruik ▶ om het antwoord te tonen.</div>
+            </div>
+          )}
           <BidKeyboard onBid={handleBid} minBidVal={minBidVal} />
         </>
       )}
 
+      {/* Net opgelost / onthuld: bevestiging + commentaar */}
+      {started && step<total && isSouth(step) && (solvedSteps[step]||revealed) && (
+        <div className={`fb ${solvedSteps[step]?'correct':'info'}`}>
+          <div className="fb-lbl">{solvedSteps[step]?'✓ Correct':'Antwoord'}</div>
+          <div className="fb-text">
+            {DNL['S']} bood <strong style={{color:'var(--felt)'}}>{bidDisp(auction[step]).text}</strong>.
+          </div>
+        </div>
+      )}
+
+      {/* Commentaar bij huidig bod */}
+      {showComment && (
+        <div className="bid-comment">
+          <div className="bc-lbl">Commentaar</div>
+          {comments[step]}
+        </div>
+      )}
+
+      {/* Einde: contract + alle handen */}
+      {auctionComplete && (
+        <>
+          <div className="fb correct">
+            <div className="fb-lbl">✓ Bieding voltooid</div>
+            <div className="fb-text">
+              Eindcontract: <strong>{contractDisp||'—'}</strong>
+              {board.declarer && <> door {DNL[board.declarer]}</>}.
+              {score.t>0 && <> Score: {score.c}/{score.t} correct.</>}
+            </div>
+          </div>
+          <div className="card" style={{marginTop:10}}>
+            <div className="card-sub" style={{marginBottom:8}}>Alle handen</div>
+            <div className="all-hands">
+              {['N','E','S','W'].map(d=>(
+                <div key={d} className="hand-block" style={{marginBottom:8}}>
+                  <div className="hand-name">{DNL[d]}</div>
+                  <HandView dir={d} hand={board.hands[d]} compact />
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Onderbalk */}
       <div className="bot-nav">
-        <button className="btn sec" style={{flex:1}} onClick={reset}>↺ Opnieuw</button>
-        {feedback && !done && (
-          <button className="btn" style={{flex:2}} onClick={handleNext}>Volgende →</button>
+        {!started && (
+          <button className="btn" style={{flex:1}} onClick={begin}>Start bieding →</button>
         )}
-        {done && (
-          <button className="btn" style={{flex:2}} onClick={reset}>↺ Herspeel</button>
+        {started && (
+          <button className="btn sec" style={{flex:1}} onClick={()=>{
+            setStep(-1); setPendingBid(null); setWrongBid(null);
+            setRevealed(false); setSolvedSteps({}); setScore({c:0,t:0});
+          }}>↺ Opnieuw</button>
         )}
-        {!isSouthTurn && !feedback && !done && !auctionComplete && (
-          <button className="btn" style={{flex:2}} onClick={()=>setHistory(getAutoHistory(effectiveHistory))}>Doorgaan →</button>
+        {started && !auctionComplete && (
+          <button className="btn" style={{flex:2}} onClick={goNext}
+            disabled={!atSouthTurn && step>=total-1}>
+            {atSouthTurn ? 'Antwoord tonen →' : 'Volgende →'}
+          </button>
         )}
       </div>
     </div>
@@ -782,7 +903,7 @@ function UitspelenTab({ board }) {
   const leader = curLeader || board.playLeader || getLHO(board.declarer);
 
   // Order of play for current trick
-  const dirs=['N','W','E','S'];
+  const dirs=['N','E','S','W'];
   const li=dirs.indexOf(leader);
   const trickOrder=[...dirs.slice(li),...dirs.slice(0,li)];
   const southPos=trickOrder.indexOf('S');
